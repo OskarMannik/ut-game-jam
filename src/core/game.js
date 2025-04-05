@@ -6,6 +6,7 @@ import { LevelManager } from '../world/level.js';
 import { UI } from '../ui/ui.js';
 import { AudioManager } from './audio.js';
 import { NetworkManager } from './network.js';
+import { SupabaseService } from './supabaseService.js';
 
 // <<< DEFINE WebSocket Server URL (Replace with your actual server URL) >>>
 const WEBSOCKET_URL = 'wss://vibegame-game-server.onrender.com'; // <<< UPDATED
@@ -19,6 +20,7 @@ export class Game {
     this.player = null;
     this.ui = new UI();
     this.audio = new AudioManager();
+    this.supabase = new SupabaseService(); // <<< INSTANTIATE
     this.isRunning = false;
     this.isPaused = false;
     this.isUserPaused = false;
@@ -61,6 +63,20 @@ export class Game {
     this.input.init();
     this.ui.init(this.state);
     
+    // <<< ADD: Fetch and Display Initial High Scores >>>
+    if (this.supabase && typeof this.supabase.getHighScores === 'function') {
+        this.supabase.getHighScores().then(scores => {
+            this.ui.showInitialHighScores(scores);
+        }).catch(e => {
+            console.error("Failed to get initial high scores:", e);
+            this.ui.showInitialHighScores([]); // Show panel even on error
+        });
+    } else {
+         console.warn("Supabase service not available for initial high score fetch.");
+         // Optionally show panel with error/loading state
+         // this.ui.showInitialHighScores([]); 
+    }
+
     // Create first level
     await this.levelManager.loadLevel(0);
     
@@ -75,17 +91,22 @@ export class Game {
     // Set camera to follow player
     this.renderer.setFollowTarget(this.player.mesh);
     
-    // Start the game loop
-    this.isRunning = true;
-    this.clock.start();
-    this.update();
-    
-    // Maybe play a general ambient track?
-    this.audio.playMusic('surface', { volume: 0.4 }); // Play surface music quieter
-
-    // <<< ADD: Connect to WebSocket Server >>>
-    this.network = new NetworkManager(WEBSOCKET_URL, this); 
+    // Connect to WebSocket Server
+    this.network = new NetworkManager(WEBSOCKET_URL, this);
     this.network.connect();
+
+    // <<< ADD: Start Game Loop Function (called by UI button) >>>
+    this.startGameLoop = () => {
+       if (this.isRunning) return; // Prevent multiple starts
+       console.log("Starting game loop...");
+       this.isRunning = true;
+       this.clock.start();
+       this.update();
+       this.audio.playMusic('surface', { volume: 0.4 });
+       this.ui.hideInitialHighScores(); // Ensure panel is hidden
+    };
+    // Assign it to window for the UI button to call easily for now
+    window.startGameLoop = this.startGameLoop;
   }
 
   update() {
@@ -312,7 +333,22 @@ export class Game {
     
     this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty); 
     
-    this.ui.showGameOver(this.state); 
+    // Save High Score (async but we don't need to wait here)
+    this.supabase.saveHighScore(
+      this.playerName, 
+      this.state.finalScore,
+      this.state.gameTimer, // Pass game time
+      this.state.artifacts  // Pass artifacts collected
+    ).catch(e => console.error("Failed to save high score on game over:", e)); 
+    
+    // <<< Fetch and display high scores >>>
+    this.supabase.getHighScores().then(scores => {
+        this.ui.showGameOver(this.state, scores); // Pass scores to UI
+    }).catch(e => {
+        console.error("Failed to get high scores for game over screen:", e);
+        this.ui.showGameOver(this.state, []); // Show screen even if fetch fails
+    });
+    
     this.audio.play('game_over');
     
     // Stop music on game over
@@ -415,9 +451,26 @@ export class Game {
     
     this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty);
       
-    this.audio.stopMusic(); 
+    // Save High Score (async but we don't need to wait here)
+    this.supabase.saveHighScore(
+      this.playerName, 
+      this.state.finalScore,
+      this.state.gameTimer, // Pass game time
+      this.state.artifacts  // Pass artifacts collected
+    ).catch(e => console.error("Failed to save high score on game won:", e)); 
+    
+    // <<< Fetch and display high scores >>>
+    this.supabase.getHighScores().then(scores => {
+        this.ui.showGameWon(this.state, scores); // Pass scores to UI
+    }).catch(e => {
+        console.error("Failed to get high scores for game won screen:", e);
+        this.ui.showGameWon(this.state, []); // Show screen even if fetch fails
+    });
+    
+    // Don't show UI immediately, wait for fetch (or show loading state)
+    // this.ui.showGameWon(this.state); 
+    this.audio.stopMusic();
     this.audio.play('game_win_sound');
-    this.ui.showGameWon(this.state); // Pass updated state
   }
 
   // <<< MODIFY: Player Respawn Logic >>>

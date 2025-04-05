@@ -23,6 +23,8 @@ export class UI {
     this.healthBar = null;
     this.touchControls = {};
     this.chatUI = {};
+    this.highScoreDisplay = {};
+    this.initialHighScorePanel = null;
     
     this.isFading = false;
     this.activeMemoryTimeout = null;
@@ -65,6 +67,7 @@ export class UI {
     this.createCrosshair();
     this.createTouchControls();
     this.createChatUI();
+    this.createInitialHighScorePanel();
     
     // Add CSS
     this.addStyles();
@@ -197,7 +200,12 @@ export class UI {
         Artifacts Found: <span class="stat-value artifacts-stat">0 / 4</span><br> 
         Memories Recovered: <span class="stat-value memories-stat">0 / 4</span>
       `;
-    
+      
+    const highScoreContainer = document.createElement('div');
+    highScoreContainer.className = 'high-score-list-container';
+    highScoreContainer.innerHTML = `<h4>High Scores</h4><ul class="high-score-list"><li>Loading...</li></ul>`;
+    this.highScoreDisplay.gameOverList = highScoreContainer.querySelector('.high-score-list');
+      
     const restartButton = document.createElement('button');
     restartButton.className = 'restart-button';
     restartButton.textContent = 'Try Again';
@@ -214,6 +222,7 @@ export class UI {
     content.appendChild(title);
     content.appendChild(subtitle);
     content.appendChild(statsContainer);
+    content.appendChild(highScoreContainer);
     content.appendChild(restartButton);
     
     this.gameOverScreen.appendChild(content);
@@ -976,6 +985,105 @@ export class UI {
       .chat-send-button:hover {
           background-color: #555;
       }
+
+      /* <<< ADD: High Score List Styles >>> */
+      .high-score-list-container {
+         margin-top: 20px;
+         padding-top: 15px;
+         border-top: 1px solid #555;
+         text-align: left;
+         max-height: 150px; /* Limit height and allow scrolling if needed */
+         overflow-y: auto;
+      }
+      .high-score-list-container h4 {
+          margin: 0 0 10px 0;
+          text-align: center;
+          color: #bbb;
+      }
+      .high-score-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+      }
+      .high-score-list li {
+          display: flex;
+          justify-content: space-between;
+          padding: 3px 0;
+          border-bottom: 1px dotted #444;
+          color: #eee;
+      }
+       .high-score-list li:last-child {
+          border-bottom: none;
+      }
+       .high-score-list li span:first-child {
+          font-weight: bold;
+      }
+       .high-score-list li span:last-child {
+          color: #4CAF50; /* Score color */
+      }
+
+      /* <<< ADD: Initial High Score Panel Styles >>> */
+      #initial-highscore-panel {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.8); /* Darker overlay */
+          display: flex; /* Use flex to center content */
+          justify-content: center;
+          align-items: center;
+          z-index: 900; /* Below name input, above game */
+          color: white;
+          font-family: sans-serif;
+      }
+      .initial-highscore-content {
+          background-color: rgba(10, 30, 50, 0.95);
+          padding: 20px 30px;
+          border-radius: 8px;
+          border: 1px solid #4488cc;
+          width: 90%;
+          max-width: 400px;
+          max-height: 70%;
+          display: flex;
+          flex-direction: column;
+      }
+      .initial-highscore-content h2 {
+          text-align: center;
+          margin-top: 0;
+          margin-bottom: 15px;
+          color: #eee;
+      }
+      /* Use existing high score list styles within */
+      .initial-highscore-content .high-score-list-container,
+      .initial-highscore-content .high-score-list {
+           max-height: none; /* Remove height limit for initial display */
+           overflow-y: auto; /* Allow scroll if many scores */
+           flex-grow: 1; /* Allow list to take up space */
+           margin-bottom: 15px;
+           /* Inherits list item styles from below */
+      }
+       .initial-highscore-content p {
+           text-align: center;
+           font-size: 0.8em;
+           color: #aaa;
+           margin: 10px 0;
+       }
+       #close-initial-scores {
+          padding: 10px 20px;
+          font-size: 15px;
+          font-weight: bold;
+          color: white;
+          background-color: #5cb85c; /* Green */
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          transition: background-color 0.3s;
+          align-self: center; /* Center button */
+       }
+        #close-initial-scores:hover {
+           background-color: #4cae4c;
+       }
     `;
     
     document.head.appendChild(style);
@@ -1074,7 +1182,7 @@ export class UI {
     });
   }
   
-  showGameOver(gameState) {
+  showGameOver(gameState, highScores = []) {
     if (!this.gameOverScreen) return;
 
     // Find elements within the game over screen
@@ -1106,6 +1214,9 @@ export class UI {
         if (artifactsSpan) artifactsSpan.textContent = `${gameState.artifacts} / 4`;
         if (memoriesSpan) memoriesSpan.textContent = `${gameState.memories} / 4`;
     }
+
+    // Display high scores
+    this.displayHighScores(this.highScoreDisplay.gameOverList, highScores);
 
     // Show the screen
     this.gameOverScreen.style.display = 'flex';
@@ -1199,7 +1310,7 @@ export class UI {
     }
   }
 
-  showGameWon(gameState) {
+  showGameWon(gameState, highScores = []) {
     if (!this.gameWonScreen) return;
     const statsContainer = this.gameWonScreen.querySelector('.game-over-stats'); 
      if (statsContainer) {
@@ -1213,6 +1324,10 @@ export class UI {
         if (artifactsSpan) artifactsSpan.textContent = `${gameState.artifacts} / 4`;
         if (memoriesSpan) memoriesSpan.textContent = `${gameState.memories} / 4`;
     }
+
+    // Display high scores
+    this.displayHighScores(this.highScoreDisplay.gameWonList, highScores);
+
     this.gameWonScreen.style.display = 'flex';
   }
   
@@ -1336,5 +1451,73 @@ export class UI {
            // Could remove entirely after longer timeout
        }
     }, 15000); // Start fading after 15 seconds
+  }
+
+  // <<< ADD: Function to display high scores >>>
+  displayHighScores(listElement, scores) {
+      if (!listElement) return;
+      listElement.innerHTML = ''; // Clear previous entries (like "Loading...")
+
+      if (!scores || scores.length === 0) {
+          listElement.innerHTML = '<li>No scores yet!</li>';
+          return;
+      }
+
+      scores.forEach((score, index) => {
+          const li = document.createElement('li');
+          // Handle potential null player_name (though we try to avoid it)
+          const playerName = score.player_name || 'Anonymous'; 
+          li.innerHTML = `<span>${index + 1}. ${playerName}</span><span>${score.score}</span>`;
+          listElement.appendChild(li);
+      });
+  }
+
+  // <<< ADD: Create Initial High Score Panel >>>
+  createInitialHighScorePanel() {
+    this.initialHighScorePanel = document.createElement('div');
+    this.initialHighScorePanel.id = 'initial-highscore-panel';
+    this.initialHighScorePanel.innerHTML = `
+        <div class="initial-highscore-content">
+            <h2>Top Scores</h2>
+            <ul class="high-score-list"><li>Loading...</li></ul>
+            <p>(Scores will update after you play)</p>
+            <button id="close-initial-scores">Start Game</button> <!-- Optional close button -->
+        </div>
+    `;
+    // Hide it initially, game logic will show it
+    this.initialHighScorePanel.style.display = 'none';
+    document.body.appendChild(this.initialHighScorePanel);
+
+    // Add event listener to close button
+    const closeButton = this.initialHighScorePanel.querySelector('#close-initial-scores');
+    if(closeButton) {
+        closeButton.addEventListener('click', () => {
+             // <<< Call the function exposed by Game.js >>>
+            if (typeof window.startGameLoop === 'function') {
+                window.startGameLoop();
+            } else {
+                 // Fallback if function not found
+                 this.hideInitialHighScores();
+                 console.warn("startGameLoop function not found on window.");
+            }
+        });
+    }
+  }
+
+  // <<< ADD: Method to show the initial high scores >>>
+  showInitialHighScores(scores) {
+      if (!this.initialHighScorePanel) return;
+      const listElement = this.initialHighScorePanel.querySelector('.high-score-list');
+      if (listElement) {
+          this.displayHighScores(listElement, scores); // Reuse existing display logic
+      }
+      this.initialHighScorePanel.style.display = 'flex'; // Show the panel
+  }
+
+  // <<< ADD: Method to hide the initial high scores >>>
+  hideInitialHighScores() {
+      if (this.initialHighScorePanel) {
+          this.initialHighScorePanel.style.display = 'none';
+      }
   }
 } 
