@@ -2,37 +2,44 @@ import * as THREE from 'three';
 
 export class Biome {
   constructor(type) {
-    this.type = type; // 'surface', 'underwater', 'cave', 'cosmic'
+    this.type = type; // 'surface', 'underwater', 'cave', 'cosmic', 'descent'
     this.groundObjects = [];
     this.decorativeObjects = [];
+    this.collisionObjects = [];
     this.particleSystems = [];
     this.environmentalEffects = [];
   }
   
   createEnvironment(scene) {
     // Set up scene background, fog, and base geometry based on environment type
+    let environmentData = {}; // Initialize return object
     switch (this.type) {
       case 'surface':
-        this.createSurfaceEnvironment(scene);
+        environmentData = this.createSurfaceEnvironment(scene);
         break;
       case 'underwater':
-        this.createUnderwaterEnvironment(scene);
+        environmentData = this.createUnderwaterEnvironment(scene);
         break;
       case 'cave':
-        this.createCaveEnvironment(scene);
+        environmentData = this.createCaveEnvironment(scene);
         break;
       case 'cosmic':
-        this.createCosmicEnvironment(scene);
+        environmentData = this.createCosmicEnvironment(scene);
+        break;
+      case 'descent':
+        environmentData = this.createDescentEnvironment(scene);
         break;
       default:
         console.warn(`Unknown biome type: ${this.type}`);
-        this.createSurfaceEnvironment(scene); // Default to surface
+        environmentData = this.createDescentEnvironment(scene);
     }
     
-    // Return ground objects for collision detection and ground checks
+    // Return ground objects, collision objects, and potentially the first platform + platform list
     return {
         groundObjects: this.groundObjects,
-        collisionObjects: this.decorativeObjects // Assuming decorations are also collision obstacles for now
+        collisionObjects: this.collisionObjects,
+        firstPlatform: environmentData.firstPlatform || null,
+        platforms: environmentData.platforms || []
     };
   }
   
@@ -63,18 +70,73 @@ export class Biome {
     
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
+    
+    // <<< Return object (no firstPlatform here) >>>
+    return {};
   }
   
   createUnderwaterEnvironment(scene) {
     console.log("[Biome] Creating Underwater Environment...");
     // Underwater blue
     scene.background = new THREE.Color(0x0a4a80);
-    scene.fog = new THREE.FogExp2(0x0a4a80, 0.03);
+    scene.fog = new THREE.FogExp2(0x0a4a80, 0.015);
     console.log("[Biome] Background and Fog set.");
     
-    // Sandy bottom
-    this.createGround(scene, new THREE.Color(0xddcc88), 300, false);
-    console.log("[Biome] Ground created. Ground objects count:", this.groundObjects.length);
+    // Define box dimensions
+    const boxSize = 200;
+    const boxHeight = 50;
+
+    // Sandy bottom (Floor)
+    const ground = this.createGround(scene, new THREE.Color(0xddcc88), boxSize, false);
+    // ground is already added to this.groundObjects and scene in createGround
+    this.collisionObjects.push(ground); // Add floor to collisions
+    console.log("[Biome] Ground created and added to collisions. Ground objects count:", this.groundObjects.length);
+
+    // Ceiling
+    const ceilingGeometry = new THREE.PlaneGeometry(boxSize, boxSize);
+    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0x052540, side: THREE.DoubleSide });
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+    ceiling.position.set(0, boxHeight, 0); // Position ceiling at the top
+    ceiling.rotation.x = Math.PI / 2; // Rotate to face down
+    scene.add(ceiling);
+    this.collisionObjects.push(ceiling);
+
+    // Walls (using BoxGeometry for simplicity might be better, but let's use planes)
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x083860, side: THREE.DoubleSide });
+
+    // Wall +Z
+    const wallPosZGeometry = new THREE.PlaneGeometry(boxSize, boxHeight);
+    const wallPosZ = new THREE.Mesh(wallPosZGeometry, wallMaterial);
+    wallPosZ.position.set(0, boxHeight / 2, boxSize / 2);
+    wallPosZ.rotation.y = Math.PI;
+    scene.add(wallPosZ);
+    this.collisionObjects.push(wallPosZ);
+
+    // Wall -Z
+    const wallNegZGeometry = new THREE.PlaneGeometry(boxSize, boxHeight);
+    const wallNegZ = new THREE.Mesh(wallNegZGeometry, wallMaterial);
+    wallNegZ.position.set(0, boxHeight / 2, -boxSize / 2);
+    // No rotation needed
+    scene.add(wallNegZ);
+    this.collisionObjects.push(wallNegZ);
+
+    // Wall +X
+    const wallPosXGeometry = new THREE.PlaneGeometry(boxSize, boxHeight);
+    const wallPosX = new THREE.Mesh(wallPosXGeometry, wallMaterial);
+    wallPosX.position.set(boxSize / 2, boxHeight / 2, 0);
+    wallPosX.rotation.y = -Math.PI / 2;
+    scene.add(wallPosX);
+    this.collisionObjects.push(wallPosX);
+
+    // Wall -X
+    const wallNegXGeometry = new THREE.PlaneGeometry(boxSize, boxHeight);
+    const wallNegX = new THREE.Mesh(wallNegXGeometry, wallMaterial);
+    wallNegX.position.set(-boxSize / 2, boxHeight / 2, 0);
+    wallNegX.rotation.y = Math.PI / 2;
+    scene.add(wallNegX);
+    this.collisionObjects.push(wallNegX);
+
+    console.log("[Biome] Ceiling and Walls created and added to collisions.");
     
     // Add coral, rocks, underwater plants
     this.addUnderwaterDecorations(scene);
@@ -112,6 +174,9 @@ export class Biome {
     }
     console.log("[Biome] Underwater lighting added.");
     console.log("[Biome] Underwater Environment Creation COMPLETE.");
+    
+    // <<< Return object (no firstPlatform here) >>>
+    return {};
   }
   
   createCaveEnvironment(scene) {
@@ -139,6 +204,9 @@ export class Biome {
     this.addCaveCrystals(scene);
     console.log("[Biome] Cave crystals (with lights) added.");
     console.log("[Biome] Cave Environment Creation COMPLETE.");
+    
+    // <<< Return object (no firstPlatform here) >>>
+    return {};
   }
   
   createCosmicEnvironment(scene) {
@@ -171,6 +239,9 @@ export class Biome {
       );
       scene.add(cosmicLight);
     }
+    
+    // <<< Return object (no firstPlatform here) >>>
+    return {};
   }
   
   createGround(scene, color, size, hasTexture = true) {
@@ -216,6 +287,10 @@ export class Biome {
       );
       scene.add(tree);
       this.decorativeObjects.push(tree);
+      const trunk = tree.getObjectByName('trunk');
+      if (trunk) {
+          this.collisionObjects.push(trunk);
+      }
     }
     
     // Add rocks
@@ -228,6 +303,7 @@ export class Biome {
       );
       scene.add(rock);
       this.decorativeObjects.push(rock);
+      this.collisionObjects.push(rock);
     }
   }
   
@@ -351,6 +427,7 @@ export class Biome {
     const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
     trunk.position.y = 2.5;
     trunk.castShadow = true;
+    trunk.name = 'trunk';
     treeGroup.add(trunk);
     
     // Foliage (simple cone for now)
@@ -657,7 +734,7 @@ export class Biome {
     const shapeGroup = new THREE.Group();
     
     // Random shape type
-    const shapeType = Math.floor(Math.random() * 6);
+    const shapeType = Math.random() * 6;
     let geometry;
     
     switch (shapeType) {
@@ -720,4 +797,203 @@ export class Biome {
     // For this demo, we'll just log that we would add these particles
     console.log('Would add cosmic particle systems');
   }
+
+  createDescentEnvironment(scene) {
+    console.log("[Biome] Creating Descent Environment...");
+    
+    // <<< REVERT to Solid Background Color >>>
+    scene.background = new THREE.Color(0x7db6d5); // Sky blue
+    // <<< COMMENT OUT Skybox Call >>>
+    // this.createSkybox(scene);
+    
+    scene.fog = new THREE.Fog(0x7db6d5, 50, 150); 
+    console.log("[Biome] Background and Fog set."); // Adjust log message
+
+    // Remove previous lights
+    scene.remove(scene.getObjectByName('topLight')); // Remove if previously added by name
+    scene.remove(scene.getObjectByName('ambientLight'));
+    
+    // Add lighting (directional sunlight)
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    sunLight.position.set(50, 100, 50); // Standard sun position
+    sunLight.castShadow = true;
+    // Configure shadows for better quality
+    sunLight.shadow.mapSize.width = 2048; 
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 500; // Adjust if needed for descent height
+    sunLight.shadow.camera.left = -100;
+    sunLight.shadow.camera.right = 100;
+    sunLight.shadow.camera.top = 100;
+    sunLight.shadow.camera.bottom = -100;
+    sunLight.name = 'sunLight'; // Optional name
+    scene.add(sunLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Brighter ambient
+    ambientLight.name = 'ambientLight'; // Optional name
+    scene.add(ambientLight);
+    console.log("[Biome] Lighting added.");
+
+    // Generate floating platforms
+    const platformCount = 30;
+    const startY = 145; // <<< INCREASED FURTHER: Start Y level for first platform >>>
+    const endY = 10;   
+    const horizontalRange = 25;
+    const playerStartY = 150; // <<< INCREASED FURTHER: Player actual start height >>>
+
+    let currentY = startY;
+    let lastPlatformPos = new THREE.Vector3(0, playerStartY, 0); 
+    let firstPlatform = null; // Variable to store the first platform
+    const platforms = []; // Array to store platform meshes
+
+    for (let i = 0; i < platformCount; i++) {
+      let platform;
+      let nextPos;
+      let platformHeight = 1; 
+      let platformSizeX = 0, platformSizeZ = 0; // <<< Keep track of platform size >>>
+      
+      if (i === 0) {
+        // <<< CREATE Specific First Platform >>>
+        const firstPlatformSize = 20;
+        platformHeight = 1;
+        platformSizeX = firstPlatformSize;
+        platformSizeZ = firstPlatformSize;
+        const firstPlatformGeometry = new THREE.BoxGeometry(platformSizeX, platformHeight, platformSizeZ);
+        const firstPlatformMaterial = new THREE.MeshStandardMaterial({
+          color: 0x778899, 
+          roughness: 0.8,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.7
+        });
+        platform = new THREE.Mesh(firstPlatformGeometry, firstPlatformMaterial);
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        nextPos = new THREE.Vector3(0, startY, 0); // Center the first platform below player start
+        firstPlatform = platform; // Assign to firstPlatform variable
+      } else {
+        // <<< GENERATE Random Subsequent Platforms >>>
+        // <<< Assign size variables inside createFloatingPlatform call context >>>
+        const sizeX = Math.random() * 4 + 4;
+        const sizeZ = Math.random() * 4 + 4;
+        platformHeight = 0.5 + Math.random() * 0.5;
+        platform = this.createFloatingPlatform(sizeX, sizeZ, platformHeight); 
+        platformSizeX = sizeX;
+        platformSizeZ = sizeZ;
+        
+        // Position platforms progressively lower and randomly horizontally
+        const progress = i / (platformCount - 1); 
+        const averageYDrop = (startY - endY) / (platformCount - 1);
+        const yDrop = averageYDrop * (1 + progress * 0.5) * (1 + (Math.random() - 0.5) * 0.4); 
+        currentY -= yDrop;
+        
+        let x = (Math.random() - 0.5) * horizontalRange * 2;
+        let z = (Math.random() - 0.5) * horizontalRange * 2;
+
+        // <<< ADD: Force offset for the second platform (i=1) >>>
+        if (i === 1) {
+            const minOffset = 8; // Minimum horizontal distance from center (0,0)
+            let attempts = 0;
+            // Keep generating random x, z until they are far enough from the center
+            while (Math.sqrt(x*x + z*z) < minOffset && attempts < 10) {
+                 x = (Math.random() - 0.5) * horizontalRange * 2;
+                 z = (Math.random() - 0.5) * horizontalRange * 2;
+                 attempts++;
+            }
+            console.log(`[Biome] Second platform (i=1) positioned at ${x.toFixed(1)}, ${currentY.toFixed(1)}, ${z.toFixed(1)}`);
+        }
+        
+        nextPos = new THREE.Vector3(x, currentY, z);
+        
+        // Ensure subsequent platforms aren't *too* far horizontally from the *previous* one
+        const horizontalDist = new THREE.Vector2(nextPos.x - lastPlatformPos.x, nextPos.z - lastPlatformPos.z).length();
+        // <<< MODIFY: Allow slightly larger horizontal jumps lower down >>>
+        const maxHorizontalDist = 18 + progress * 4; // Max dist increases from 18 to 22
+        if (horizontalDist > maxHorizontalDist) { 
+           const dir = new THREE.Vector2(nextPos.x - lastPlatformPos.x, nextPos.z - lastPlatformPos.z).normalize().multiplyScalar((maxHorizontalDist - 3) + Math.random() * 3); // Target near max distance
+           nextPos.x = lastPlatformPos.x + dir.x;
+           nextPos.z = lastPlatformPos.z + dir.y; 
+        }
+      }
+
+      platform.position.set(nextPos.x, nextPos.y, nextPos.z);
+      lastPlatformPos.copy(nextPos);
+      
+      platforms.push(platform);
+
+      scene.add(platform);
+      this.groundObjects.push(platform); 
+      this.collisionObjects.push(platform); 
+
+      // <<< ADD Obstacles >>>
+      if (i > 0 && Math.random() < 0.4) { // Add obstacles to ~40% of platforms (not the first)
+          const obstacleType = Math.random();
+          let obstacle;
+          if (obstacleType < 0.5) { // Add a rock
+              obstacle = this.createRock();
+              // Scale rock slightly
+              obstacle.scale.set(0.5, 0.5, 0.5);
+          } else { // Add a tree
+              obstacle = this.createTree();
+              // Scale tree slightly smaller
+              obstacle.scale.set(0.4, 0.4, 0.4);
+          }
+          
+          // Position obstacle randomly on the platform surface
+          const halfWidth = platformSizeX / 2 * 0.8; // 80% of half-width
+          const halfDepth = platformSizeZ / 2 * 0.8; // 80% of half-depth
+          obstacle.position.set(
+              platform.position.x + (Math.random() - 0.5) * halfWidth,
+              platform.position.y + platformHeight / 2, // Place on top surface
+              platform.position.z + (Math.random() - 0.5) * halfDepth
+          );
+          scene.add(obstacle);
+          this.decorativeObjects.push(obstacle);
+          // Add obstacle to collision objects as well
+          // Need to add individual components if it's a group (like the tree)
+          obstacle.traverse((child) => {
+              if (child.isMesh) {
+                  this.collisionObjects.push(child);
+              }
+          });
+      }
+    }
+    console.log(`[Biome] Generated ${platformCount} platforms.`);
+
+    // Final ground plane at the bottom
+    const finalGround = this.createGround(scene, new THREE.Color(0x334455), 500, false);
+    finalGround.position.y = 0; // Set ground at Y=0
+    this.collisionObjects.push(finalGround); // Also add to collision
+    console.log("[Biome] Final ground plane created.");
+
+    console.log("[Biome] Descent Environment Creation COMPLETE.");
+    return { firstPlatform: firstPlatform, platforms: platforms };
+  }
+
+  createFloatingPlatform(sizeX, sizeZ, platformHeight) {
+    const platformGeometry = new THREE.BoxGeometry(sizeX, platformHeight, sizeZ);
+    const platformMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color().setHSL(0.3, 0.4 + Math.random() * 0.2, 0.3 + Math.random() * 0.15), // Varying shades of green
+      roughness: 0.9, // Make it look less shiny, more earthy
+      metalness: 0.0
+    });
+    
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    
+    return platform;
+  }
+
+  // <<< Keep Skybox Creation function commented out >>>
+  /*
+  createSkybox(scene) {
+      const loader = new THREE.CubeTextureLoader();
+      const texture = loader.setPath('/textures/skybox/').load([
+          'px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'
+      ]);
+      scene.background = texture;
+      console.log("[Biome] Skybox created.");
+  }
+  */
 } 

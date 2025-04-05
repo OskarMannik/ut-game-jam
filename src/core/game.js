@@ -15,18 +15,21 @@ export class Game {
     this.player = null;
     this.ui = new UI();
     this.audio = new AudioManager();
-    this.currentLevel = 0;
     this.isRunning = false;
     this.isPaused = false;
+    this.isUserPaused = false;
     this.interactingNPC = null;
     
     // Game state
     this.state = {
-      oxygen: 100,
       artifacts: 0,
       memories: 0,
       collectedMemories: [],
-      depth: 0
+      depth: 0,
+      gameTimer: 0,
+      gameOverReason: null,
+      gameWon: false,
+      finalScore: 0
     };
 
     // Bind methods
@@ -58,32 +61,57 @@ export class Game {
     this.clock.start();
     this.update();
     
+    // Maybe play a general ambient track?
+    this.audio.playMusic('surface', { volume: 0.4 }); // Play surface music quieter
+    
     console.log('Game initialized');
   }
 
   update() {
     if (!this.isRunning) return;
     
+    // <<< MOVE: Calculate deltaTime first
+    const deltaTime = this.isUserPaused ? 0 : this.clock.getDelta(); // Get deltaTime ONLY if not user-paused
+    
     // Always get input state first
     const inputState = this.input.getInputState();
 
-    // Handle Pause State (Dialogue Advancement / Unpausing)
-    if (this.isPaused) {
+    // --- Check for User Pause Toggle --- 
+    if (inputState.pause) {
+        this.togglePause();
+        this.input.clearInputState(); // Consume the pause input for this frame
+    }
+
+    // Handle Dialogue Pause State (takes precedence over user pause for dialogue flow)
+    if (this.isPaused && this.interactingNPC) { // Paused for dialogue
       if (inputState.interact && this.interactingNPC) {
         // If paused for dialogue and interact is pressed, get the next line
-        const nextDialogueData = this.interactingNPC.interact();
         
-        if (nextDialogueData.canTrade) {
-          // Last line reached, NPC wants to trade
-          this.presentTradeOptions(nextDialogueData);
-        } else if (nextDialogueData.isComplete) {
-          // If dialogue cycle is complete (and no trade), hide UI, unpause, clear NPC
-          this.unpauseAndEndDialogue();
-        } else {
-          // Otherwise, just update the dialogue text
-          this.ui.showDialogue(nextDialogueData.speaker, nextDialogueData.text);
-          this.input.clearInputState(); // Consume input for this frame
+        // <<< MODIFY: Check for win condition NPC interaction >>>
+        if (this.interactingNPC.appearance?.isWinConditionNPC) {
+          this.checkWinCondition();
+          // If checkWinCondition triggers win, it will set isRunning = false
+          // If not won, proceed with normal dialogue or end it
+          if (this.isRunning) {
+             this.unpauseAndEndDialogue();
+          }
         }
+        // Original Trade Logic (can be kept or removed)
+        // else {
+        //   const nextDialogueData = this.interactingNPC.interact();
+        //   if (nextDialogueData.canTrade) {
+        //     this.presentTradeOptions(nextDialogueData);
+        //   } else if (nextDialogueData.isComplete) {
+        //     this.unpauseAndEndDialogue();
+        //   } else {
+        //     this.ui.showDialogue(nextDialogueData.speaker, nextDialogueData.text);
+        //     this.input.clearInputState(); // Consume input for this frame
+        //   }
+        // }
+         else { // <<< ADD: Handle non-win NPC dialogue >>>
+             // Default behavior: just end dialogue after first interaction for non-win NPCs
+             this.unpauseAndEndDialogue();
+         }
       } else if (inputState.interact && !this.interactingNPC) {
           // Failsafe: If paused but somehow lost NPC ref, just unpause
           this.unpauseAndEndDialogue();
@@ -93,42 +121,38 @@ export class Game {
       return; // Prevent rest of update logic (player movement etc.)
     }
     
-    // --- If NOT paused --- 
-    const deltaTime = this.clock.getDelta(); // Get deltaTime ONLY if not paused
-
-    // Check if player initiated NEW dialogue this frame
-    const dialogueData = this.player.getCurrentDialogue();
-    console.log(`[Game.update] Received dialogue data from player:`, dialogueData); // Will be null unless interact happened in player.update
-    if (dialogueData) {
-      // Initiate dialogue and pause
-      this.ui.showDialogue(dialogueData.speaker, dialogueData.text);
-      this.isPaused = true; 
-      this.interactingNPC = dialogueData.npc; 
-      this.input.clearInputState(); // Consume the initial interact press
-    } else {
-      // Normal game updates only if NOT starting dialogue
-      this.player.update(deltaTime, inputState, this.levelManager);
-      this.levelManager.update(deltaTime, this.player);
-      
-      // Process collected items
-      const collectedItems = this.player.getCollectedItems();
-      collectedItems.forEach(itemData => {
-        if (itemData.type === 'artifact') {
-          this.collectArtifact(itemData);
-        } else if (itemData.type === 'memory') {
-          this.collectMemory(itemData);
-        }
-      });
-
-      // Update oxygen based on depth
-      this.updateGameState(deltaTime);
-      
-      // Update UI (non-dialogue parts)
-      this.ui.update(this.state);
-      
-      // Check for level transition
-      this.checkLevelTransition();
+    // --- Handle User Pause State --- 
+    if (this.isUserPaused) {
+        // Optional: Render a pause screen overlay via UI
+        this.renderer.render(this.levelManager.scene, 0); // Render static scene
+        requestAnimationFrame(this.update);
+        return; // Skip game logic updates
     }
+    
+    // --- If NOT paused (by dialogue or user) --- 
+    // const dialogueData = this.player.getCurrentDialogue();
+    // console.log(`[Game.update] Received dialogue data from player:`, dialogueData); 
+    // if (dialogueData) { ... } else { ... }
+    
+    // Normal game updates only if NOT starting dialogue
+    this.player.update(deltaTime, inputState, this.levelManager);
+    this.levelManager.update(deltaTime, this.player);
+    
+    // Process collected items
+    const collectedItems = this.player.getCollectedItems();
+    collectedItems.forEach(itemData => {
+      if (itemData.type === 'artifact') {
+        this.collectArtifact(itemData);
+      } else if (itemData.type === 'memory') {
+        this.collectMemory(itemData);
+      }
+    });
+
+    // <<< SIMPLIFY: Update game state (only checks win/lose now) >>>
+    this.updateGameState(deltaTime);
+    
+    // Update UI (non-dialogue parts)
+    this.ui.update(this.state);
     
     // Render the current frame (happens whether paused check passed or not, unless returned early)
     this.renderer.render(this.levelManager.scene, deltaTime);
@@ -138,71 +162,28 @@ export class Game {
   }
   
   updateGameState(deltaTime) {
-    // Update depth based on player y position
-    this.state.depth = Math.abs(this.player.mesh.position.y);
-    
-    // Only deplete oxygen when below a certain depth (deeper than 2 units)
-    if (this.state.depth > 2) {
-      // Deplete oxygen faster based on depth - reduced rate increase
-      const depletionRate = 1 + ((this.state.depth - 2) * 0.1); // Reduced multiplier from 0.2
-      this.state.oxygen = Math.max(0, this.state.oxygen - (depletionRate * deltaTime));
-    } else {
-      // Replenish oxygen when near the surface - increased rate
-      this.state.oxygen = Math.min(100, this.state.oxygen + (12 * deltaTime)); // Increased from 10
-    }
-    
-    // Play low oxygen sound
-    this.audio.playHeartbeat(this.state.oxygen);
+    // <<< MODIFY: Calculate Depth from first platform surface (145.5) >>>
+    const firstPlatformTopY = 145.5; // Platform center Y (145) + half height (0.5)
+    this.state.depth = Math.max(0, firstPlatformTopY - this.player.mesh.position.y);
 
-    // Check for game over
-    if (this.state.oxygen <= 0) {
-      this.gameOver();
-    }
-  }
-  
-  checkLevelTransition() {
-    // Check for transition requested by interaction first
-    const interactionTransition = this.player.getRequestedTransition();
-    if (interactionTransition) {
-      this.transitionToLevel(interactionTransition.targetLevel, interactionTransition.entryPoint);
-      return; // Prioritize interaction transition
+    // Increment Timer 
+    if (!this.isUserPaused && !this.isPaused) { 
+        this.state.gameTimer += deltaTime; // Count up
     }
 
-    // Then, check for transitions based on proximity
-    const proximityTransition = this.levelManager.checkTransitionPoint(this.player.mesh.position);
-    if (proximityTransition) {
-      this.transitionToLevel(proximityTransition.targetLevel, proximityTransition.entryPoint);
-    }
-  }
-  
-  async transitionToLevel(levelIndex, entryPoint) {
-    // Fade out
-    await this.ui.fadeOut();
-    
-    // Play transition sound
-    this.audio.play('level_transition');
-
-    // Stop looping sounds from previous level
-    this.audio.stopAllLoops();
-
-    // Load new level
-    await this.levelManager.loadLevel(levelIndex);
-    
-    // Reposition player
-    const newPosition = this.levelManager.getEntryPosition(entryPoint);
-    this.player.setPosition(newPosition);
-    
-    // Add player to new scene
-    this.levelManager.scene.add(this.player.mesh);
-    
-    // Start ambient sounds for new level
-    const newLevelData = this.levelManager.levels[levelIndex];
-    if (newLevelData) {
-        this.audio.playAmbientSounds(newLevelData.environmentType);
+    // Check for falling out of world
+    if (this.player.mesh.position.y < -20) { 
+      this.gameOver('fall');
     }
 
-    // Fade in
-    await this.ui.fadeIn();
+    // Basic win condition - reaching the bottom
+    if (this.player.isGrounded && this.player.mesh.position.y < 5) { // Adjust Y threshold as needed
+      // Optional: Check if all artifacts are collected first
+      // const totalArtifacts = this.levelManager.collectibles.filter(c => c.type === 'artifact').length;
+      // if (this.state.artifacts >= totalArtifacts) {
+        this.gameWon();
+      // }
+    }
   }
   
   collectArtifact(artifactData) {
@@ -213,6 +194,11 @@ export class Game {
     }
     // Play collection sound
     this.audio.play('artifact_collect');
+
+    // <<< MODIFY: Enable HIGH jump on first artifact collect >>>
+    if (this.state.artifacts === 1 && this.player) {
+        this.player.enableHighJump();
+    }
   }
   
   collectMemory(memoryData) {
@@ -221,8 +207,8 @@ export class Game {
     if (!this.state.collectedMemories.some(m => m.id === memoryData.id)) {
         this.state.collectedMemories.push(memoryData);
     }
-    // Show memory flashback
-    this.ui.showMemoryFlashback(memoryData);
+    // <<< COMMENT OUT: Disable flashback UI >>>
+    // this.ui.showMemoryFlashback(memoryData);
     // Play memory sound
     this.audio.play('memory_collect');
   }
@@ -231,6 +217,7 @@ export class Game {
     // Apply various effects based on artifact type
     switch (effect.type) {
       case 'oxygen_efficiency':
+        // <<< REMOVE/COMMENT OUT: No longer relevant >>>
         // Improve oxygen efficiency
         break;
       case 'night_vision':
@@ -244,25 +231,70 @@ export class Game {
     }
   }
   
-  gameOver() {
+  gameOver(reason = 'unknown') { 
+    if (!this.isRunning) return; 
     this.isRunning = false;
-    this.ui.showGameOver();
+    this.state.gameOverReason = reason;
+    
+    // <<< MODIFY Score Calculation >>>
+    // Remove time penalty
+    // const timePenalty = Math.floor(this.state.gameTimer * 10); 
+    const artifactBonus = this.state.artifacts * 500; 
+    // Add fall penalty - e.g., penalize heavily for falls over a certain threshold
+    const fallThreshold = 10; // Only penalize falls greater than 10 units
+    const fallPenaltyMultiplier = 50; // Points lost per unit fallen over threshold
+    const fallPenalty = Math.max(0, (this.player.maxFallDistanceThisSession - fallThreshold)) * fallPenaltyMultiplier;
+    console.log(`Calculating score: MaxFall=${this.player.maxFallDistanceThisSession.toFixed(2)}, FallPenalty=${fallPenalty.toFixed(0)}, ArtifactBonus=${artifactBonus}`);
+    
+    this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty); 
+    
+    this.ui.showGameOver(this.state); 
     this.audio.play('game_over');
+    
+    // Stop music on game over
+    this.audio.stopMusic();
+    // <<< ADD: Stop looping sounds >>>
+    this.audio.stopAllLoops(); 
   }
   
-  restart() {
+  async restart() {
     // Reset game state
     this.state = {
-      oxygen: 100,
       artifacts: 0,
       memories: 0,
       collectedMemories: [],
-      depth: 0
+      depth: 0, 
+      gameTimer: 0, 
+      gameOverReason: null,
+      gameWon: false,
+      finalScore: 0 
     };
+
+    // <<< Reset Player Stats >>>
+    if (this.player) {
+        this.player.resetSessionStats();
+    }
     
-    // Reload first level
-    this.transitionToLevel(0, 'start');
+    // Ensure UI is reset 
+    this.ui.hideGameOver(); 
+    
+    // Stop music before restart transition
+    this.audio.stopMusic();
+    
+    // <<< SIMPLIFY: Reload level 0 directly, no transition >>>
+    await this.levelManager.loadLevel(0);
+    const newPosition = this.levelManager.getEntryPosition('start');
+    this.player.setPosition(newPosition);
+    this.levelManager.scene.add(this.player.mesh); // Re-add player to scene
+    this.audio.playMusic('surface', { volume: 0.4 }); // Restart music
+    
+    // Restart the game loop
     this.isRunning = true;
+    this.isPaused = false;
+    this.isUserPaused = false;
+    this.interactingNPC = null;
+    this.clock.start();
+    this.update();
   }
 
   // Helper function to unpause and clean up dialogue state
@@ -273,61 +305,56 @@ export class Game {
     this.input.clearInputState(); 
   }
 
-  // Function to handle presenting trade options
-  presentTradeOptions(dialogueData) {
-    const npc = this.interactingNPC;
-    const playerMemories = this.state.collectedMemories;
-    const desire = dialogueData.desire;
-    const offer = dialogueData.offer;
-
-    let canFulfill = false;
-    let matchingMemory = null;
-
-    // Check if player has a memory matching the desire
-    if (desire.type === 'resonance') {
-      matchingMemory = playerMemories.find(mem => mem.data.resonance === desire.value);
-      canFulfill = !!matchingMemory;
-    } // Add checks for desire.type === 'id' later if needed
-
-    let options = [];
-    if (canFulfill) {
-      options.push({
-        text: `Offer Memory of ${desire.value} (ID: ${matchingMemory.id})`,
-        callback: () => this.executeTrade(npc, matchingMemory, offer)
-      });
+  // <<< ADD: Toggle Pause Method
+  togglePause() {
+    this.isUserPaused = !this.isUserPaused;
+    if (this.isUserPaused) {
+      this.clock.stop(); // Stop the clock to halt physics time
+      this.audio.pauseAudio(); // <<< Use new method
+      this.ui.showPauseScreen(); // Show UI overlay
+    } else {
+      this.clock.start(); // Resume the clock
+      this.audio.resumeAudio(); // <<< Use new method
+      this.ui.hidePauseScreen(); // Hide UI overlay
     }
-    options.push({
-      text: "(Leave)",
-      callback: () => this.unpauseAndEndDialogue()
-    });
-
-    // Show the last dialogue line again, but with trade options
-    this.ui.showDialogue(dialogueData.speaker, dialogueData.text, options);
-    this.input.clearInputState(); // Consume the input that triggered this
+    console.log(`Game ${this.isUserPaused ? 'paused' : 'resumed'}`);
   }
 
-  // Function to execute the trade
-  executeTrade(npc, playerMemoryToGive, npcOffer) {
-    console.log(`Executing trade: Giving ${playerMemoryToGive.id}, Receiving ${npcOffer.id}`);
+  // <<< MODIFY: Check Win Condition >>>
+  checkWinCondition() {
+    // Win condition is now simply interacting with the Guardian after spawning
+    if (this.interactingNPC && this.interactingNPC.name === "Guardian of the Depths") {
+        this.gameWon();
+    } else {
+        // This should ideally not be reached if interaction logic is correct,
+        // but leave a failsafe dialogue
+        this.ui.showDialogue(
+            this.interactingNPC?.name || "???",
+            `Something seems incomplete...`,
+            [{ text: "(Leave)", callback: () => this.unpauseAndEndDialogue() }]
+        );
+        this.input.clearInputState();
+    }
+  }
 
-    // 1. Remove memory from player state
-    this.state.collectedMemories = this.state.collectedMemories.filter(mem => mem.id !== playerMemoryToGive.id);
-    this.state.memories--; // Update count
-
-    // 2. Add offered memory to player state
-    // We need to get the full memory data for the offered ID
-    // For now, let's assume we have a way to fetch it (or create it on the fly if simple)
-    // Placeholder: Just log for now
-    console.log(`Need to implement logic to get/create memory data for ${npcOffer.id}`);
-    // TODO: Implement getting offered memory data and adding it to this.state.collectedMemories
-    // Example: const offeredMemoryData = findMemoryDataById(npcOffer.id);
-    // this.state.collectedMemories.push(offeredMemoryData);
-    // this.state.memories++;
-
-    // 3. (Optional) Update NPC state - maybe they have different dialogue now?
-    // npc.memoryReceived(playerMemoryToGive.id); // Add method to NPC class later
-
-    // 4. End dialogue
-    this.unpauseAndEndDialogue();
+  gameWon() {
+    if (!this.isRunning) return; 
+    console.log("GAME WON!");
+    this.isRunning = false;
+    this.state.gameWon = true;
+    
+    // <<< MODIFY Score Calculation >>>
+    // const timePenalty = Math.floor(this.state.gameTimer * 10);
+    const artifactBonus = this.state.artifacts * 500; 
+    const fallThreshold = 10; 
+    const fallPenaltyMultiplier = 50; 
+    const fallPenalty = Math.max(0, (this.player.maxFallDistanceThisSession - fallThreshold)) * fallPenaltyMultiplier;
+    console.log(`Calculating score: MaxFall=${this.player.maxFallDistanceThisSession.toFixed(2)}, FallPenalty=${fallPenalty.toFixed(0)}, ArtifactBonus=${artifactBonus}`);
+    
+    this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty);
+      
+    this.audio.stopMusic(); 
+    // this.audio.play('game_win_sound');
+    this.ui.showGameWon(this.state); // Pass updated state
   }
 } 

@@ -178,4 +178,26 @@ export class PerlinNoise {
     
     return heights;
   }
+}
+
+/**
+ * Formats seconds into MM:SS format.
+ * @param {number} totalSeconds - The total number of seconds.
+ * @returns {string} The formatted time string.
+ */
+export function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+/**
+ * Linearly interpolates between two values.
+ * @param {number} a - The start value.
+ * @param {number} b - The end value.
+ * @param {number} t - The interpolation factor (0 to 1).
+ * @returns {number} The interpolated value.
+ */
+export function lerp(a, b, t) {
+  return a + (b - a) * t;
 } 

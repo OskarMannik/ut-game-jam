@@ -8,7 +8,8 @@ export class InputManager {
       jump: false,
       down: false,
       action: false,
-      interact: false
+      interact: false,
+      pause: false
     };
     
     // Key mappings (can be customized later)
@@ -24,7 +25,8 @@ export class InputManager {
       ' ': 'jump',
       'z': 'down',
       'e': 'interact',
-      'f': 'action'
+      'f': 'action',
+      'p': 'pause'
     };
     
     // Bind event handlers

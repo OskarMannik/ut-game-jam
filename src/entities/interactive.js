@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export class InteractiveObject {
-  constructor(position, name, interactCallback) {
+  constructor(position, name, interactCallback, options = {}) {
     this.position = position.clone();
     this.name = name;
     this.interactCallback = interactCallback;
@@ -10,13 +10,14 @@ export class InteractiveObject {
     this.pulseIntensity = 0;
     this.pulseDirection = 1;
     this.pulseSpeed = 3;
+    this.alwaysVisible = options.alwaysVisible || false;
     
     // Create the mesh
     this.mesh = this.createMesh();
     this.mesh.position.copy(this.position);
     
     // Text label
-    this.label = this.createLabel();
+    this.label = this.createLabel(name);
     this.mesh.add(this.label);
     
     // Trigger box for detecting player proximity
@@ -60,24 +61,63 @@ export class InteractiveObject {
     this.coreMesh = core;
     this.light = light;
     
+    if (this.alwaysVisible) {
+      // Slightly less prominent if always visible but not highlighted
+      this.baseMesh.material.opacity = 0.8;
+      this.light.intensity = 1.0;
+      this.coreMesh.material.opacity = 0.85;
+    } else {
+      // Default appearance for objects that highlight on approach
+      this.baseMesh.material.opacity = 0.7;
+      this.light.intensity = 1.0;
+      this.coreMesh.material.opacity = 0.8;
+    }
+    
     return portalGroup;
   }
   
-  createLabel() {
-    // This would normally use HTML or THREE.js text geometry
-    // For now, we'll just create a placeholder
-    const labelGeometry = new THREE.PlaneGeometry(2, 0.5);
+  createLabel(name) {
+    // Use a canvas texture for better text rendering
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const fontSize = 48; // Use a larger font size for better texture quality
+    context.font = `Bold ${fontSize}px Arial`;
+    const textWidth = context.measureText(name).width;
+
+    // Scale canvas to fit text, power of 2 dimensions often preferred for textures
+    canvas.width = THREE.MathUtils.ceilPowerOfTwo(textWidth + 40); // Add padding
+    canvas.height = THREE.MathUtils.ceilPowerOfTwo(fontSize + 20); // Add padding
+
+    // Re-apply font and draw text after resize
+    context.font = `Bold ${fontSize}px Arial`;
+    context.fillStyle = 'rgba(255, 255, 255, 0.95)'; // Slightly less transparent
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(name, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
     const labelMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      map: texture,
       transparent: true,
-      opacity: 0,
-      side: THREE.DoubleSide
+      opacity: 0, // Start hidden unless alwaysVisible
+      side: THREE.DoubleSide,
+      depthWrite: false // Prevent z-fighting issues with transparent text
     });
-    
+
+    // Adjust plane size based on canvas aspect ratio to avoid stretching
+    const planeHeight = 1.0; // Make label a bit bigger
+    const planeWidth = planeHeight * (canvas.width / canvas.height);
+    const labelGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+
     const label = new THREE.Mesh(labelGeometry, labelMaterial);
-    label.position.y = 2; // Position above the object
-    label.rotation.x = Math.PI / 2; // Face upward
-    
+    label.position.y = 2.5; // Position slightly higher above the object
+    label.userData.isBillboard = true; // Flag for renderer to make it face camera
+
+    // Set initial opacity based on alwaysVisible flag
+    label.material.opacity = this.alwaysVisible ? 1.0 : 0;
+
     return label;
   }
   
@@ -100,19 +140,21 @@ export class InteractiveObject {
   
   updateHighlight() {
     if (this.isHighlighted) {
-      // Show highlight effect
-      this.baseMesh.material.emissiveIntensity = 1.0;
-      this.light.intensity = 2.0;
-      
-      // Show label
-      this.label.material.opacity = 1.0;
+      // Brighter highlight effect
+      this.baseMesh.material.emissiveIntensity = 1.5; 
+      this.light.intensity = 2.5;
+      // Ensure label is visible when highlighted (even if alwaysVisible)
+      this.label.material.opacity = 1.0; 
     } else {
-      // Reset to normal appearance
-      this.baseMesh.material.emissiveIntensity = 0.5;
-      this.light.intensity = 1.0;
+      // Reset to normal (potentially always visible) appearance
+      this.baseMesh.material.emissiveIntensity = this.alwaysVisible ? 0.8 : 0.5;
+      this.light.intensity = this.alwaysVisible ? 1.5 : 1.0;
       
-      // Hide label
-      this.label.material.opacity = 0;
+      // Hide label only if not alwaysVisible
+      if (!this.alwaysVisible) {
+        this.label.material.opacity = 0;
+      }
+      // If alwaysVisible, label opacity is already 1 from createLabel/highlight
     }
   }
   

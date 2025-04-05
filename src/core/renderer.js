@@ -207,6 +207,14 @@ export class Renderer {
     // Update camera position
     this.updateCamera();
     
+    // Update billboards
+    scene.traverse((object) => {
+        if (object.userData.isBillboard && this.camera) {
+            // Make the object face the camera
+            object.quaternion.copy(this.camera.quaternion);
+        }
+    });
+
     // Render the scene
     if (this.postProcessing.enabled && this.postProcessing.composer) {
       this.postProcessing.composer.render(deltaTime);

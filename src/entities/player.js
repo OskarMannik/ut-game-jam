@@ -6,14 +6,8 @@ export class Player {
     this.moveSpeed = 10;
     this.turnSpeed = 2.5;
     this.jumpForce = 15;
+    this.highJumpForceMultiplier = 1.4; // Multiplier for high jump
     this.gravity = 30;
-    this.swimSpeed = 3.5;
-    this.backwardSwimMultiplier = 0.7;
-    this.verticalSwimMultiplier = 3.6;
-    this.underwaterTurnMultiplier = 0.45;
-    this.underwaterDrag = 0.92;
-    this.underwaterIdleSinkRate = 0.5; // Rate at which player sinks when idle
-    this.isUnderwater = false;
     this.canTelekinesis = false;
     
     // Player state
@@ -21,8 +15,14 @@ export class Player {
     this.isGrounded = false;
     this.isJumping = false;
     this.isFalling = false;
-    this.isSwimming = false;
     this.currentDialogue = null; // To hold dialogue data from interaction
+    this.currentFallDistance = 0; // Track current fall
+    this.maxFallDistanceThisSession = 0; // Track max fall in session
+    this.hasHighJump = false; // Ability state
+    
+    // Step sound timing
+    this.stepTimer = 0;
+    this.stepInterval = 0.4; // Time between step sounds in seconds
     
     // Create player mesh
     this.mesh = this.createPlayerMesh();
@@ -101,26 +101,8 @@ export class Player {
     
     // Reset collected items and interaction requests for this frame
     this.collectedItemsThisFrame = [];
-    this.requestedTransition = null;
     
-    const wasUnderwater = this.isUnderwater; // Store previous state
-    this.isUnderwater = levelManager.isPositionUnderwater ? 
-      levelManager.isPositionUnderwater(this.mesh.position) : false;
-    
-    // Check for water entry/exit
-    if (this.isUnderwater && !wasUnderwater) {
-        window.game?.audio.play('player_splash', { volume: 0.8 }); // Entered water
-        // Optionally stop step sounds if implemented
-    } else if (!this.isUnderwater && wasUnderwater) {
-        window.game?.audio.play('player_splash', { volume: 0.6 }); // Exited water
-    }
-    
-    // Handle player movement based on environment
-    if (this.isUnderwater) {
-      this.updateUnderwaterMovement(deltaTime, inputState);
-    } else {
-      this.updateLandMovement(deltaTime, inputState, levelManager);
-    }
+    this.updateLandMovement(deltaTime, inputState, levelManager);
     
     // Update player position based on velocity
     this.mesh.position.x += this.velocity.x * deltaTime;
@@ -152,6 +134,7 @@ export class Player {
   }
   
   updateLandMovement(deltaTime, inputState, levelManager) {
+    const previousYVelocity = this.velocity.y; // Store velocity before gravity
     // Check if player is grounded
     this.checkGrounded(levelManager);
     
@@ -167,12 +150,17 @@ export class Player {
     const right = new THREE.Vector3(1, 0, 0);
     right.applyQuaternion(this.mesh.quaternion);
     
+    // Track if player is moving
+    let isMoving = false;
+    
     // Apply movement based on input
     if (inputState.forward) {
       this.velocity.add(forward.multiplyScalar(this.moveSpeed));
+      isMoving = true;
     }
     if (inputState.backward) {
       this.velocity.add(forward.multiplyScalar(-this.moveSpeed * 0.7)); // Slower backward movement
+      isMoving = true;
     }
     if (inputState.left) {
       this.mesh.rotation.y += this.turnSpeed * deltaTime;
@@ -182,61 +170,55 @@ export class Player {
     }
     
     // Handle jumping
-    if (inputState.jump && this.isGrounded && !this.isJumping) {
-      this.velocity.y = this.jumpForce;
-      this.isJumping = true;
-      this.isGrounded = false;
-      window.game?.audio.play('player_jump'); // Play jump sound via global game instance
+    if (inputState.jump && this.isGrounded) {
+        // Calculate jump force based on ability
+        const effectiveJumpForce = this.hasHighJump 
+            ? this.jumpForce * this.highJumpForceMultiplier 
+            : this.jumpForce;
+        
+        this.velocity.y = effectiveJumpForce;
+        this.isJumping = true;
+        this.isGrounded = false;
+        window.game?.audio.play('player_jump'); 
+        if (this.hasHighJump) {
+            console.log("High Jump!");
+        }
     }
     
     // Apply gravity
     if (!this.isGrounded) {
-      this.isFalling = true; // Track falling state
+      if (!this.isFalling && this.velocity.y < 0) { // Start falling only when moving down
+         this.isFalling = true;
+         this.currentFallDistance = 0; 
+      } else if (this.isFalling) {
+         // Continue falling - add vertical distance covered this frame
+         const verticalDelta = Math.abs(previousYVelocity * deltaTime);
+         this.currentFallDistance += verticalDelta;
+      }
       this.velocity.y -= this.gravity * deltaTime;
-    } else {
-      if (this.isFalling) { // Was falling, now grounded
+    } else { // Player is grounded
+      if (this.isFalling) { // Landed after falling
+        // Update Max Fall Distance
+        this.maxFallDistanceThisSession = Math.max(this.maxFallDistanceThisSession, this.currentFallDistance);
+        console.log(`Landed! Current Fall: ${this.currentFallDistance.toFixed(2)}, Max Fall: ${this.maxFallDistanceThisSession.toFixed(2)}`);
         window.game?.audio.play('player_step', { volume: 0.6 }); // Play step sound on landing
       }
+      // Reset falling state and vertical velocity
       this.isFalling = false;
+      this.currentFallDistance = 0; 
       this.velocity.y = 0;
       this.isJumping = false;
-    }
-  }
-  
-  updateUnderwaterMovement(deltaTime, inputState) {
-    // Different physics underwater (smoother movement, lower gravity)
-    this.velocity.multiplyScalar(this.underwaterDrag); // Apply water resistance
-    
-    // Calculate forward direction based on player rotation
-    const forward = new THREE.Vector3(0, 0, 1);
-    forward.applyQuaternion(this.mesh.quaternion);
-    
-    // Calculate right direction based on player rotation
-    const right = new THREE.Vector3(1, 0, 0);
-    right.applyQuaternion(this.mesh.quaternion);
-    
-    // Underwater movement
-    if (inputState.forward) {
-      this.velocity.add(forward.multiplyScalar(this.swimSpeed));
-    }
-    if (inputState.backward) {
-      this.velocity.add(forward.multiplyScalar(-this.swimSpeed * this.backwardSwimMultiplier));
-    }
-    if (inputState.left) {
-      this.mesh.rotation.y += this.turnSpeed * this.underwaterTurnMultiplier * deltaTime;
-    }
-    if (inputState.right) {
-      this.mesh.rotation.y -= this.turnSpeed * this.underwaterTurnMultiplier * deltaTime;
-    }
-    
-    // Swim up/down
-    if (inputState.jump) {
-      this.velocity.y += this.swimSpeed * this.verticalSwimMultiplier * deltaTime; // Swim up
-    } else if (inputState.down) {
-      this.velocity.y -= this.swimSpeed * this.verticalSwimMultiplier * deltaTime; // Swim down
-    } else {
-      // Apply a gentle downward drift when not actively swimming up or down
-      this.velocity.y -= this.underwaterIdleSinkRate * deltaTime;
+      
+      // Play step sounds while moving on ground
+      if (isMoving) {
+        this.stepTimer += deltaTime;
+        if (this.stepTimer >= this.stepInterval) {
+          window.game?.audio.play('player_step', { volume: 0.4 });
+          this.stepTimer = 0;
+        }
+      } else {
+        this.stepTimer = 0; // Reset timer when not moving
+      }
     }
   }
   
@@ -274,37 +256,78 @@ export class Player {
       return;
     }
     
+    const playerCenter = new THREE.Vector3();
+    const playerSize = new THREE.Vector3();
+    
     // Check for collisions with level geometry
-    const collisions = [];
     collisionObjects.forEach(object => {
       if (!object || !object.geometry || !object.matrixWorld) return; // Skip invalid objects
+      
       const objectHitbox = new THREE.Box3().setFromObject(object);
+      
+      // Update player hitbox for each check (needed if position changes mid-loop)
+      this.hitbox.setFromObject(this.mesh);
+
       if (this.hitbox.intersectsBox(objectHitbox)) {
-        // Basic collision resolution: Push player back along collision normal
-        // This is a very simple approach and might need refinement
-        const collisionNormal = new THREE.Vector3();
-        const playerCenter = new THREE.Vector3();
-        const objectCenter = new THREE.Vector3();
         this.hitbox.getCenter(playerCenter);
-        objectHitbox.getCenter(objectCenter);
-
-        collisionNormal.subVectors(playerCenter, objectCenter).normalize();
-
-        // Calculate penetration depth (approximation)
-        const playerSize = new THREE.Vector3();
-        const objectSize = new THREE.Vector3();
         this.hitbox.getSize(playerSize);
-        objectHitbox.getSize(objectSize);
-        const minSeparation = (playerSize.x + objectSize.x) * 0.5; // Example for X axis
-        const currentSeparation = Math.abs(playerCenter.x - objectCenter.x);
-        const depth = minSeparation - currentSeparation > 0 ? minSeparation - currentSeparation : 0;
         
-        // Push player out by the depth along the normal
-        this.mesh.position.addScaledVector(collisionNormal, depth * 1.05); // Add slight overshoot
+        const objectCenter = new THREE.Vector3();
+        const objectSize = new THREE.Vector3();
+        objectHitbox.getCenter(objectCenter);
+        objectHitbox.getSize(objectSize);
+        
+        // Calculate overlap on each axis
+        const overlap = new THREE.Vector3();
+        overlap.x = (playerSize.x / 2 + objectSize.x / 2) - Math.abs(playerCenter.x - objectCenter.x);
+        overlap.y = (playerSize.y / 2 + objectSize.y / 2) - Math.abs(playerCenter.y - objectCenter.y);
+        overlap.z = (playerSize.z / 2 + objectSize.z / 2) - Math.abs(playerCenter.z - objectCenter.z);
+        
+        // Ensure overlap is positive (can happen with floating point inaccuracies)
+        if (overlap.x <= 0 || overlap.y <= 0 || overlap.z <= 0) return; 
+
+        // Find axis with minimum overlap (Minimum Translation Vector direction)
+        let minOverlap = Infinity;
+        let pushAxis = null;
+        
+        if (overlap.x < minOverlap) { minOverlap = overlap.x; pushAxis = 'x'; }
+        if (overlap.y < minOverlap) { minOverlap = overlap.y; pushAxis = 'y'; }
+        if (overlap.z < minOverlap) { minOverlap = overlap.z; pushAxis = 'z'; }
+
+        const mtv = new THREE.Vector3(); // Minimum Translation Vector
+        const pushAmount = minOverlap * 1.01; // Add a small buffer to ensure separation
+
+        // Determine push direction based on relative centers
+        if (pushAxis === 'x') {
+          mtv.x = Math.sign(playerCenter.x - objectCenter.x);
+        } else if (pushAxis === 'y') {
+          mtv.y = Math.sign(playerCenter.y - objectCenter.y);
+        } else if (pushAxis === 'z') {
+          mtv.z = Math.sign(playerCenter.z - objectCenter.z);
+        }
+
+        // Apply the push based on MTV
+        this.mesh.position.addScaledVector(mtv, pushAmount);
+
+        // Adjust velocity: Remove component pointing into the obstacle (along MTV)
+        const velocityAlongNormal = this.velocity.dot(mtv);
+        if (velocityAlongNormal < 0) { // Only adjust if moving towards the obstacle
+            const correction = mtv.clone().multiplyScalar(velocityAlongNormal);
+            this.velocity.sub(correction);
+        }
+        
+        // Special handling for vertical collisions
+        if (pushAxis === 'y') {
+             // If pushed upwards (hit feet) and falling, ensure grounded state
+             if (mtv.y > 0 && !this.isJumping) { 
+                 this.isGrounded = true;
+                 this.isFalling = false;
+             } 
+        }
       }
     });
 
-    // Re-update hitbox after position adjustment
+    // Final hitbox update after all collisions are resolved for this frame
     this.hitbox.setFromObject(this.mesh);
   }
   
@@ -329,8 +352,6 @@ export class Player {
   }
   
   interact(levelManager) {
-    // Reset requested transition first
-    this.requestedTransition = null; 
     this.currentDialogue = null; // Also reset dialogue request
 
     // Check for NPCs first
@@ -346,23 +367,6 @@ export class Player {
       }
       return; // Prioritize NPC interaction
     }
-
-    // If no NPC found, check for interactive objects
-    const interactiveObject = levelManager.getClosestInteractiveObject(
-      this.mesh.position,
-      3 // Interaction radius
-    );
-    
-    if (interactiveObject) {
-      const transitionData = interactiveObject.interact();
-      if (transitionData) {
-        this.requestedTransition = transitionData;
-      }
-    }
-  }
-  
-  getRequestedTransition() {
-    return this.requestedTransition;
   }
   
   getCurrentDialogue() {
@@ -408,5 +412,18 @@ export class Player {
   takeDamage(amount) {
     // Placeholder for damage system
     console.log(`Player takes ${amount} damage`);
+  }
+  
+  resetSessionStats() {
+      this.currentFallDistance = 0;
+      this.maxFallDistanceThisSession = 0;
+  }
+  
+  enableHighJump() {
+      if (!this.hasHighJump) {
+          console.log("High Jump Enabled!");
+          this.hasHighJump = true;
+          // Optional: Add a UI notification or visual effect
+      }
   }
 } 

@@ -1,8 +1,15 @@
 import * as THREE from 'three';
 import { createCollectible } from '../entities/collectible.js';
-import { InteractiveObject } from '../entities/interactive.js';
 import { NPC } from '../entities/npc.js';
 import { Biome } from './biome.js';
+
+// Helper function to shuffle an array (Fisher-Yates algorithm)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
 
 export class LevelManager {
   constructor() {
@@ -10,13 +17,12 @@ export class LevelManager {
     this.currentLevel = null;
     this.levels = [];
     this.collectibles = [];
-    this.interactiveObjects = [];
     this.npcs = [];
-    this.waterLevel = 0; // Y-position of water surface (for underwater detection)
     this.movableObjects = [];
     this.collisionObjects = [];
-    this.transitionPoints = [];
     this.groundObjects = []; // Store ground objects for ground check
+    this.firstPlatform = null; // Store reference to the first platform
+    this.generatedPlatforms = []; // Store generated platforms
     
     // Define the different levels/biomes in the game
     this.defineLevels();
@@ -26,95 +32,23 @@ export class LevelManager {
     // Level 0: Surface - Starting area
     this.levels.push({
       id: 0,
-      name: 'Surface',
-      type: 'surface',
-      environmentType: 'surface',
-      waterLevel: -10, // Water is below the ground level
-      playerStart: new THREE.Vector3(0, 2, 0),
+      name: 'The Descent',
+      type: 'descent',
+      environmentType: 'descent',
+      playerStart: new THREE.Vector3(0, 150, 0),
       entries: {
-        'start': new THREE.Vector3(0, 2, 0),
-        'return_from_underwater': new THREE.Vector3(10, 2, 20)
-      }
-    });
-    
-    // Level 1: Underwater - First depth layer
-    this.levels.push({
-      id: 1,
-      name: 'Underwater',
-      type: 'underwater',
-      environmentType: 'underwater',
-      waterLevel: 50, // Everything is underwater in this level
-      playerStart: new THREE.Vector3(0, -5, 0),
-      entries: {
-        'start': new THREE.Vector3(0, -5, 0),
-        'from_surface': new THREE.Vector3(0, -5, 0),
-        'return_from_cave': new THREE.Vector3(-20, -5, -10)
-      }
-    });
-    
-    // Level 2: Underwater Caves - Second depth layer
-    this.levels.push({
-      id: 2,
-      name: 'Underwater Caves',
-      type: 'cave',
-      environmentType: 'cave',
-      waterLevel: 50, // Partially underwater cave system
-      playerStart: new THREE.Vector3(0, -20, 0),
-      entries: {
-        'start': new THREE.Vector3(0, -20, 0),
-        'from_underwater': new THREE.Vector3(5, -20, 5),
-        'return_from_ruins': new THREE.Vector3(-5, -20, -15)
-      }
-    });
-    
-    // Level 3: Ancient Ruins - Third depth layer
-    this.levels.push({
-      id: 3,
-      name: 'Ancient Ruins',
-      type: 'ruins',
-      environmentType: 'cave',
-      waterLevel: 30, // Some underwater sections
-      playerStart: new THREE.Vector3(0, -40, 0),
-      entries: {
-        'start': new THREE.Vector3(0, -40, 0),
-        'from_cave': new THREE.Vector3(10, -40, 10),
-        'return_from_subconscious': new THREE.Vector3(-10, -40, -10)
-      }
-    });
-    
-    // Level 4: Subconscious - Fourth depth layer
-    this.levels.push({
-      id: 4,
-      name: 'Subconscious',
-      type: 'subconscious',
-      environmentType: 'cosmic',
-      waterLevel: -100, // No water in this abstract realm
-      playerStart: new THREE.Vector3(0, -70, 0),
-      entries: {
-        'start': new THREE.Vector3(0, -70, 0),
-        'from_ruins': new THREE.Vector3(0, -70, 20),
-        'return_from_void': new THREE.Vector3(0, -70, -20)
-      }
-    });
-    
-    // Level 5: Cosmic Void - Final depth layer
-    this.levels.push({
-      id: 5,
-      name: 'Cosmic Void',
-      type: 'void',
-      environmentType: 'cosmic',
-      waterLevel: -100, // No water
-      playerStart: new THREE.Vector3(0, -100, 0),
-      entries: {
-        'start': new THREE.Vector3(0, -100, 0),
-        'from_subconscious': new THREE.Vector3(0, -100, 0)
-      }
+        'start': new THREE.Vector3(0, 150, 0)
+      },
     });
   }
   
   async loadLevel(levelIndex) {
+    if (levelIndex !== 0) {
+      console.warn(`Attempting to load non-existent level: ${levelIndex}. Loading level 0 instead.`);
+      levelIndex = 0; 
+    }
     if (levelIndex < 0 || levelIndex >= this.levels.length) {
-      console.error(`Level ${levelIndex} does not exist`);
+      console.error(`Level 0 does not exist`);
       return false;
     }
     
@@ -127,26 +61,16 @@ export class LevelManager {
     // Create new scene
     this.scene = new THREE.Scene();
     
-    // Set water level for this level
-    this.waterLevel = this.currentLevel.waterLevel;
-    
     // Create the environment based on level type
     const biome = new Biome(this.currentLevel.environmentType);
     const environmentData = biome.createEnvironment(this.scene);
     this.collisionObjects = environmentData.collisionObjects || [];
     this.groundObjects = environmentData.groundObjects || []; // Store ground objects for ground check
+    this.firstPlatform = environmentData.firstPlatform || null; // Store first platform
+    this.generatedPlatforms = environmentData.platforms || []; // Store generated platforms
     
     // Add collectibles specific to this level
     this.addLevelCollectibles(levelIndex);
-    
-    // Add interactive objects
-    this.addLevelInteractiveObjects(levelIndex);
-    
-    // Add NPCs
-    this.addLevelNPCs(levelIndex);
-    
-    // Add transition points between levels
-    this.addLevelTransitionPoints(levelIndex);
     
     console.log(`Loaded level: ${this.currentLevel.name}`);
     return true;
@@ -155,57 +79,59 @@ export class LevelManager {
   clearLevel() {
     // Clear references to objects
     this.collectibles = [];
-    this.interactiveObjects = [];
     this.movableObjects = [];
     this.collisionObjects = [];
-    this.transitionPoints = [];
     this.groundObjects = [];
     this.npcs = [];
+    this.firstPlatform = null; // Reset first platform
+    this.generatedPlatforms = []; // Reset generated platforms
     
     // Scene will be replaced entirely
   }
   
   addLevelCollectibles(levelIndex) {
-    // Add collectibles based on level
-    switch (levelIndex) {
-      case 0: // Surface
-        // A few basic collectibles to get started
-        this.addCollectible(new THREE.Vector3(10, 1, 10), 'memory', 'surface_memory_1');
-        this.addCollectible(new THREE.Vector3(-10, 1, -10), 'memory', 'surface_memory_2');
-        break;
-        
-      case 1: // Underwater
-        // Underwater artifacts and memories
-        this.addCollectible(new THREE.Vector3(15, -8, 15), 'artifact', 'underwater_artifact_1', 'oxygen_efficiency');
-        this.addCollectible(new THREE.Vector3(-15, -6, 5), 'memory', 'underwater_memory_1');
-        this.addCollectible(new THREE.Vector3(0, -10, -20), 'memory', 'underwater_memory_2');
-        break;
-        
-      case 2: // Underwater Caves
-        // Cave artifacts and memories
-        this.addCollectible(new THREE.Vector3(20, -22, 10), 'artifact', 'cave_artifact_1', 'night_vision');
-        this.addCollectible(new THREE.Vector3(-10, -25, -5), 'memory', 'cave_memory_1');
-        this.addCollectible(new THREE.Vector3(5, -18, -15), 'memory', 'cave_memory_2');
-        break;
-        
-      case 3: // Ancient Ruins
-        // Ruins artifacts and memories
-        this.addCollectible(new THREE.Vector3(-15, -38, 15), 'artifact', 'ruins_artifact_1', 'telekinesis');
-        this.addCollectible(new THREE.Vector3(25, -42, -5), 'memory', 'ruins_memory_1');
-        this.addCollectible(new THREE.Vector3(-5, -45, -25), 'memory', 'ruins_memory_2');
-        break;
-        
-      case 4: // Subconscious
-        // Subconscious memories reveal more of the story
-        this.addCollectible(new THREE.Vector3(15, -72, 15), 'memory', 'subconscious_memory_1');
-        this.addCollectible(new THREE.Vector3(-15, -68, 15), 'memory', 'subconscious_memory_2');
-        this.addCollectible(new THREE.Vector3(0, -75, -15), 'memory', 'subconscious_memory_3');
-        break;
-        
-      case 5: // Cosmic Void
-        // Final revelations
-        this.addCollectible(new THREE.Vector3(0, -98, 0), 'memory', 'void_memory_1');
-        break;
+    if (levelIndex !== 0 || this.generatedPlatforms.length < 8) { // Need at least 8 platforms for 4 artifacts + 4 memories
+        console.warn("Cannot add collectibles: Not on descent level or not enough platforms generated.");
+        return;
+    }
+
+    // Exclude the first platform from collectible placement
+    const eligiblePlatforms = this.generatedPlatforms.slice(1);
+    if (eligiblePlatforms.length < 8) {
+        console.warn("Not enough eligible platforms (excluding the first) to place all collectibles.");
+        return; // Or adjust logic to place fewer items
+    }
+
+    shuffleArray(eligiblePlatforms); // Randomize platform order
+
+    const artifactIds = ['surface_artifact_1', 'surface_artifact_2', 'underwater_artifact_1', 'underwater_artifact_2'];
+    const artifactEffects = ['oxygen_efficiency', 'night_vision', 'telekinesis', 'oxygen_efficiency']; // Match IDs
+    const memoryIds = ['surface_memory_1', 'surface_memory_2', 'underwater_memory_1', 'underwater_memory_2'];
+    
+    let platformIndex = 0;
+
+    // Place Artifacts
+    console.log(`Placing ${artifactIds.length} artifacts...`);
+    for (let i = 0; i < artifactIds.length; i++) {
+        if (platformIndex >= eligiblePlatforms.length) break; // Safety check
+        const platform = eligiblePlatforms[platformIndex++];
+        const platformPos = platform.position.clone();
+        const platformHeight = platform.geometry.parameters.height || 0.5;
+        const collectiblePos = platformPos.add(new THREE.Vector3(0, platformHeight / 2 + 1.5, 0)); // Place 1.5 units above platform center
+        this.addCollectible(collectiblePos, 'artifact', artifactIds[i], artifactEffects[i]);
+        console.log(` - Added ${artifactIds[i]} at`, collectiblePos);
+    }
+
+    // Place Memories
+    console.log(`Placing ${memoryIds.length} memories...`);
+    for (let i = 0; i < memoryIds.length; i++) {
+        if (platformIndex >= eligiblePlatforms.length) break; // Safety check
+        const platform = eligiblePlatforms[platformIndex++];
+        const platformPos = platform.position.clone();
+        const platformHeight = platform.geometry.parameters.height || 0.5;
+        const collectiblePos = platformPos.add(new THREE.Vector3(0, platformHeight / 2 + 1.5, 0)); // Place 1.5 units above platform center
+        this.addCollectible(collectiblePos, 'memory', memoryIds[i]);
+        console.log(` - Added ${memoryIds[i]} at`, collectiblePos);
     }
   }
   
@@ -216,165 +142,11 @@ export class LevelManager {
     return collectible;
   }
   
-  addLevelInteractiveObjects(levelIndex) {
-    // Add interactive objects based on level
-    switch (levelIndex) {
-      case 0: // Surface
-        // Path to underwater
-        this.addInteractiveObject(
-          new THREE.Vector3(20, 0, 20),
-          'Portal to Underwater',
-          () => {
-            console.log('Transitioning to underwater level');
-            return { targetLevel: 1, entryPoint: 'from_surface' };
-          }
-        );
-        break;
-        
-      case 1: // Underwater
-        // Path back to surface
-        this.addInteractiveObject(
-          new THREE.Vector3(20, -2, 20),
-          'Ascend to Surface',
-          () => {
-            console.log('Returning to surface');
-            return { targetLevel: 0, entryPoint: 'return_from_underwater' };
-          }
-        );
-        
-        // Path to caves
-        this.addInteractiveObject(
-          new THREE.Vector3(-20, -8, -10),
-          'Enter Underwater Caves',
-          () => {
-            console.log('Entering underwater caves');
-            return { targetLevel: 2, entryPoint: 'from_underwater' };
-          }
-        );
-        break;
-        
-      case 2: // Underwater Caves
-        // Path back to underwater
-        this.addInteractiveObject(
-          new THREE.Vector3(5, -18, 5),
-          'Return to Open Water',
-          () => {
-            console.log('Returning to underwater area');
-            return { targetLevel: 1, entryPoint: 'return_from_cave' };
-          }
-        );
-        
-        // Path to ruins
-        this.addInteractiveObject(
-          new THREE.Vector3(-5, -22, -15),
-          'Descend to Ancient Ruins',
-          () => {
-            console.log('Descending to ancient ruins');
-            return { targetLevel: 3, entryPoint: 'from_cave' };
-          }
-        );
-        break;
-        
-      case 3: // Ancient Ruins
-        // Path back to caves
-        this.addInteractiveObject(
-          new THREE.Vector3(10, -38, 10),
-          'Return to Caves',
-          () => {
-            console.log('Returning to caves');
-            return { targetLevel: 2, entryPoint: 'return_from_ruins' };
-          }
-        );
-        
-        // Path to subconscious
-        this.addInteractiveObject(
-          new THREE.Vector3(-10, -42, -10),
-          'Enter the Mysterious Portal',
-          () => {
-            console.log('Entering subconscious realm');
-            return { targetLevel: 4, entryPoint: 'from_ruins' };
-          }
-        );
-        break;
-        
-      case 4: // Subconscious
-        // Path back to ruins
-        this.addInteractiveObject(
-          new THREE.Vector3(0, -68, 20),
-          'Return to Reality',
-          () => {
-            console.log('Returning to ruins');
-            return { targetLevel: 3, entryPoint: 'return_from_subconscious' };
-          }
-        );
-        
-        // Path to void
-        this.addInteractiveObject(
-          new THREE.Vector3(0, -72, -20),
-          'Journey to the Depths',
-          () => {
-            console.log('Entering the void');
-            return { targetLevel: 5, entryPoint: 'from_subconscious' };
-          }
-        );
-        break;
-        
-      case 5: // Cosmic Void
-        // Path back to subconscious
-        this.addInteractiveObject(
-          new THREE.Vector3(0, -98, 0),
-          'Return to Consciousness',
-          () => {
-            console.log('Returning to subconscious');
-            return { targetLevel: 4, entryPoint: 'return_from_void' };
-          }
-        );
-        break;
-    }
-  }
-  
-  addInteractiveObject(position, name, interactCallback) {
-    const interactiveObject = new InteractiveObject(position, name, interactCallback);
-    this.interactiveObjects.push(interactiveObject);
-    this.scene.add(interactiveObject.mesh);
-    return interactiveObject;
-  }
-  
-  addLevelNPCs(levelIndex) {
-    switch (levelIndex) {
-      case 2: // Underwater Caves
-        this.addNPC(
-          new THREE.Vector3(-15, 0, 10), // Position in the cave
-          "Echoing Shade", 
-          [
-            "...who disturbs the silence...?",
-            "These depths hold forgotten whispers...",
-            "I sense... warmth. A flicker. Do you carry a memory of *Hope*?"
-          ],
-          { 
-            color: 0x6688cc,
-            desire: { type: 'resonance', value: 'Hope' },
-            offer: { type: 'memory', id: 'cave_memory_2' } // Offers the mystery tablet memory
-          }
-        );
-        break;
-      // Add cases for other levels later...
-    }
-  }
-  
   addNPC(position, name, dialogue, appearance) {
     const npc = new NPC(position, name, dialogue, appearance);
     this.npcs.push(npc);
     this.scene.add(npc.mesh);
     return npc;
-  }
-  
-  addLevelTransitionPoints(levelIndex) {
-    // These are invisible triggers that transition between levels when the player enters them
-    // They serve as an alternative to the interactive objects which require explicit interaction
-    
-    // For now, we won't add any automatic transition points
-    // All level transitions will be through interactive objects
   }
   
   update(deltaTime, player) {
@@ -383,11 +155,6 @@ export class LevelManager {
       if (!collectible.collected) {
         collectible.update(deltaTime);
       }
-    });
-    
-    // Update all interactive objects
-    this.interactiveObjects.forEach(obj => {
-      obj.update(deltaTime, player.mesh.position);
     });
     
     // Update NPCs
@@ -405,18 +172,21 @@ export class LevelManager {
     });
   }
   
-  isPositionUnderwater(position) {
-    if (!position) return false;
-    return position.y < this.waterLevel;
-  }
-  
   getPlayerStartPosition() {
-    return this.currentLevel ? this.currentLevel.playerStart.clone() : new THREE.Vector3(0, 2, 0);
+    if (this.firstPlatform) {
+      const platformPos = this.firstPlatform.position.clone();
+      // Get platform dimensions (assuming BoxGeometry)
+      const platformHeight = this.firstPlatform.geometry.parameters.height || 1; 
+      return platformPos.add(new THREE.Vector3(0, platformHeight / 2 + 2, 0)); // Start 2 units above platform center
+    } else {
+      // Fallback to original defined start if no platform
+      return this.currentLevel ? this.currentLevel.playerStart.clone() : new THREE.Vector3(0, 150, 0);
+    }
   }
   
   getEntryPosition(entryPointName) {
     if (!this.currentLevel || !this.currentLevel.entries[entryPointName]) {
-      console.warn(`Entry point ${entryPointName} not found in level ${this.currentLevel?.id}`);
+      console.warn(`Entry point ${entryPointName} not found in level ${this.currentLevel?.id}, using default start.`);
       return this.getPlayerStartPosition();
     }
     
@@ -484,21 +254,6 @@ export class LevelManager {
     return itemData;
   }
   
-  getClosestInteractiveObject(position, maxDistance) {
-    let closest = null;
-    let closestDistance = maxDistance * maxDistance;
-    
-    this.interactiveObjects.forEach(obj => {
-      const distanceSquared = position.distanceToSquared(obj.mesh.position);
-      if (distanceSquared < closestDistance) {
-        closest = obj;
-        closestDistance = distanceSquared;
-      }
-    });
-    
-    return closest;
-  }
-  
   getClosestNPC(position, maxDistance) {
     let closestNPC = null;
     let closestDistanceSq = maxDistance * maxDistance;
@@ -514,20 +269,6 @@ export class LevelManager {
     });
 
     return closestNPC;
-  }
-  
-  checkTransitionPoint(playerPosition) {
-    for (const point of this.transitionPoints) {
-      const distanceSquared = playerPosition.distanceToSquared(point.position);
-      if (distanceSquared <= point.radiusSquared) {
-        return {
-          targetLevel: point.targetLevel,
-          entryPoint: point.entryPoint
-        };
-      }
-    }
-    
-    return null;
   }
   
   getMovableObjects() {
