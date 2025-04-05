@@ -913,7 +913,7 @@ export class UI {
       /* <<< ADD: Chat Styles >>> */
       .chat-container {
           position: fixed;
-          bottom: 20px; /* Position above touch controls if they exist */
+          top: 20px;
           left: 20px;
           width: 300px; /* Adjust width */
           height: 200px; /* Adjust height */
