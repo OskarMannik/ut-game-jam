@@ -1,8 +1,8 @@
 body {
     margin: 0;
     overflow: hidden; /* Prevent scrollbars */
-    background-color: #7db6d5; /* Sky blue */
-    font-family: Arial, sans-serif;
+    background-color: #000;
+    font-family: 'Arial', sans-serif;
 }
 
 canvas {
@@ -19,4 +19,74 @@ canvas {
     color: white;
     background-color: rgba(0, 0, 0, 0.3);
     padding: 5px 0;
+}
+
+#loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    color: white;
+    transition: opacity 1s ease-in-out;
+}
+
+.loading-text {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #4499ff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.loading-bar {
+    width: 300px;
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.loading-progress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to right, #4499ff, #aa44ff);
+    transition: width 0.3s ease;
+}
+
+/* Depth-specific CSS for the different levels */
+.level-surface {
+    background-color: #7db6d5;
+}
+
+.level-underwater {
+    background-color: #0a4a80;
+}
+
+.level-cave {
+    background-color: #000000;
+}
+
+.level-cosmic {
+    background-color: #110022;
+}
+
+/* Low oxygen warning effect */
+.low-oxygen {
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        box-shadow: 0 0 5px 0 rgba(255, 0, 0, 0.5);
+    }
+    to {
+        box-shadow: 0 0 20px 0 rgba(255, 0, 0, 0.8);
+    }
 }
