@@ -5,6 +5,10 @@ import { Player } from '../entities/player.js';
 import { LevelManager } from '../world/level.js';
 import { UI } from '../ui/ui.js';
 import { AudioManager } from './audio.js';
+import { NetworkManager } from './network.js';
+
+// <<< DEFINE WebSocket Server URL (Replace with your actual server URL) >>>
+const WEBSOCKET_URL = 'wss://vibegame-game-server.onrender.com'; // <<< UPDATED
 
 export class Game {
   constructor() {
@@ -21,6 +25,13 @@ export class Game {
     this.interactingNPC = null;
     this.initialPlayerPosition = null;
     
+    // <<< ADD Multiplayer State >>>
+    this.network = null;
+    this.clientId = null;
+    this.otherPlayers = {}; // Store other players' data/meshes { id: { mesh, state } }
+    this.lastNetworkUpdate = 0; // Timer for throttling network updates
+    this.networkUpdateInterval = 100; // Send updates every 100ms
+
     // Game state
     this.state = {
       artifacts: 0,
@@ -66,6 +77,10 @@ export class Game {
     
     // Maybe play a general ambient track?
     this.audio.playMusic('surface', { volume: 0.4 }); // Play surface music quieter
+
+    // <<< ADD: Connect to WebSocket Server >>>
+    this.network = new NetworkManager(WEBSOCKET_URL, this); 
+    this.network.connect();
   }
 
   update() {
@@ -171,6 +186,13 @@ export class Game {
     
     // Continue the game loop
     requestAnimationFrame(this.update);
+
+    // <<< ADD: Send player state periodically >>>
+    const now = performance.now();
+    if (this.network && this.clientId && now - this.lastNetworkUpdate > this.networkUpdateInterval) {
+      this.sendPlayerState();
+      this.lastNetworkUpdate = now;
+    }
   }
   
   updateGameState(deltaTime) {
@@ -402,5 +424,111 @@ export class Game {
     if (this.player && this.player.maxHealth) {
       this.player.currentHealth = this.player.maxHealth;
     }
+  }
+
+  // <<< ADD: Send player state to server >>>
+  sendPlayerState() {
+    if (!this.player || !this.clientId) return;
+    
+    const stateToSend = {
+      position: this.player.mesh.position.toArray(),
+      rotation: this.player.mesh.quaternion.toArray(), // Send quaternion for rotation
+      health: this.player.currentHealth, // Include health
+      // Add any other relevant state: isJumping, isFalling, animationState etc.
+    };
+    
+    this.network.send('playerStateUpdate', stateToSend);
+  }
+  
+  // <<< ADD: Handlers for Network Messages >>>
+  setClientId(id) {
+     this.clientId = id;
+     console.log(`Game received Client ID: ${id}`);
+  }
+  
+  handleWorldState(playersData) {
+    console.log("Received initial world state:", playersData);
+    // Clear existing other players
+    Object.keys(this.otherPlayers).forEach(id => this.removeOtherPlayer(id));
+    
+    // Add players from the received state
+    playersData.forEach(playerData => {
+       if (playerData.id !== this.clientId) { // Don't add self
+          this.addOtherPlayer(playerData);
+       }
+    });
+  }
+  
+  handlePlayerJoined(playerData) {
+    console.log("Player joined:", playerData);
+    if (playerData.id !== this.clientId) { // Don't add self
+       this.addOtherPlayer(playerData);
+    }
+  }
+  
+  handlePlayerLeft(playerId) {
+    console.log(`Player left: ${playerId}`);
+    this.removeOtherPlayer(playerId);
+  }
+  
+  handlePlayerUpdate(playerId, state) {
+    // console.log(`Received update for player ${playerId}:`, state);
+    const otherPlayer = this.otherPlayers[playerId];
+    if (otherPlayer && otherPlayer.mesh && state) {
+       // Directly set position and rotation for now (consider interpolation later)
+       if (state.position) {
+          otherPlayer.mesh.position.fromArray(state.position);
+       }
+       if (state.rotation) {
+          otherPlayer.mesh.quaternion.fromArray(state.rotation);
+       }
+       // Update other visual state if needed (health bar, animations etc.)
+       otherPlayer.state = state; // Store latest state
+    } else if (!otherPlayer) {
+      // Optional: If update received for unknown player, request full state or ignore
+      console.warn(`Received update for unknown player ID: ${playerId}`);
+    }
+  }
+  
+  handleDisconnect() {
+      console.warn("Disconnected from server.");
+      // Clear other players on disconnect
+      Object.keys(this.otherPlayers).forEach(id => this.removeOtherPlayer(id));
+      // Optionally show a UI message
+      this.ui?.showTemporaryMessage("Disconnected from server", 5000);
+  }
+  
+  // <<< ADD: Helper methods for managing other player visuals >>>
+  addOtherPlayer(playerData) {
+      if (!playerData || !playerData.id || this.otherPlayers[playerData.id]) {
+         console.warn("Attempted to add invalid or existing player data", playerData);
+         return; // Already exists or invalid data
+      }
+      
+      // Create a simple mesh representation for the other player
+      // (Use a different color or model than the local player)
+      const geometry = new THREE.CapsuleGeometry(0.5, 1.5, 4, 8);
+      const material = new THREE.MeshStandardMaterial({ color: 0xff6633 }); // Orange color
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(0, -100, 0); // Start off-screen until first update
+      if (playerData.state && playerData.state.position) {
+          mesh.position.fromArray(playerData.state.position);
+      }
+      if (playerData.state && playerData.state.rotation) {
+          mesh.quaternion.fromArray(playerData.state.rotation);
+      }
+      
+      this.levelManager.scene.add(mesh);
+      this.otherPlayers[playerData.id] = { mesh: mesh, state: playerData.state || {} };
+      console.log(`Added visual for player ${playerData.id}`);
+  }
+  
+  removeOtherPlayer(playerId) {
+     const otherPlayer = this.otherPlayers[playerId];
+     if (otherPlayer && otherPlayer.mesh) {
+        this.levelManager.scene.remove(otherPlayer.mesh);
+        console.log(`Removed visual for player ${playerId}`);
+     }
+     delete this.otherPlayers[playerId];
   }
 } 

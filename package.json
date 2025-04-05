@@ -9,10 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.162.0"
+    "three": "^0.162.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "vite": "^5.1.0"
   },
-  "description": "An exploration game about descending into the depths for the game jam."
+  "description": "An exploration game about descending into the depths for the game jam.",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
