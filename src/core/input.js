@@ -115,13 +115,13 @@ export class InputManager {
   
   // Touch End/Cancel Handler
   onTouchEnd(event) {
-    event.preventDefault();
     const changedTouches = event.changedTouches;
     for (let i = 0; i < changedTouches.length; i++) {
       const touch = changedTouches[i];
       const action = this.activeTouches[touch.identifier];
 
       if (action) {
+        event.preventDefault(); // Prevent default ONLY if ending a button touch
         this.inputState[action] = false;
         delete this.activeTouches[touch.identifier]; // Stop tracking this touch
       }
