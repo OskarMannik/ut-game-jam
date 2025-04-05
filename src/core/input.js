@@ -94,7 +94,6 @@ export class InputManager {
   
   // Touch Start Handler
   onTouchStart(event) {
-    event.preventDefault(); // Prevent default touch actions like scrolling/zooming
     const changedTouches = event.changedTouches;
     for (let i = 0; i < changedTouches.length; i++) {
       const touch = changedTouches[i];
@@ -102,6 +101,7 @@ export class InputManager {
 
       // Check if the touch started on one of our buttons
       if (targetElement.classList.contains('touch-button')) {
+        event.preventDefault(); // Prevent default ONLY for touch buttons
         const action = targetElement.dataset.action;
         if (action && !this.activeTouches[touch.identifier]) {
            this.inputState[action] = true;
