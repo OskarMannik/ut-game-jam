@@ -515,7 +515,6 @@ export class Game {
   }
   
   handlePlayerUpdate(playerId, state) {
-    // console.log(`Received update for player ${playerId}:`, state);
     const otherPlayer = this.otherPlayers[playerId];
     if (otherPlayer && otherPlayer.mesh && state) {
        // Directly set position and rotation for now (consider interpolation later)
@@ -525,10 +524,26 @@ export class Game {
        if (state.rotation) {
           otherPlayer.mesh.quaternion.fromArray(state.rotation);
        }
-       // Update other visual state if needed (health bar, animations etc.)
-       otherPlayer.state = state; // Store latest state
+       // <<< Update name if included and different >>>
+       const receivedName = state.name || `Player_${playerId.substring(0,4)}`;
+       if (receivedName !== otherPlayer.name) {
+           otherPlayer.name = receivedName;
+           // <<< Update the sprite texture if name changes >>>
+           if (otherPlayer.nameSprite) {
+               this.updateNameSprite(otherPlayer.nameSprite, receivedName);
+           }
+       }
+       otherPlayer.state = state; // Store latest full state
+       // <<< Update name sprite position >>>
+       if (otherPlayer.nameSprite) {
+           otherPlayer.nameSprite.position.set(
+               otherPlayer.mesh.position.x,
+               otherPlayer.mesh.position.y + 2.5, // Adjust offset as needed
+               otherPlayer.mesh.position.z
+           );
+       }
     } else if (!otherPlayer) {
-      // Optional: If update received for unknown player, request full state or ignore
+      // Could potentially queue the update or request the player's full data if join message was missed
       console.warn(`Received update for unknown player ID: ${playerId}`);
     }
   }
@@ -536,9 +551,12 @@ export class Game {
   // <<< ADD: Handle incoming chat messages >>>
   handleChatMessage(senderId, messageText) {
      if (senderId === this.clientId) return; // Already displayed own message
-     console.log(`Chat from ${senderId}: ${messageText}`);
-     // Use a shortened version of the sender ID for display
-     const displayName = senderId.substring(0, 6);
+     
+     // <<< FIX: Find player name from stored data >>>
+     const senderData = this.otherPlayers[senderId];
+     const displayName = senderData?.name || senderId.substring(0, 6); // Use stored name or fallback ID
+     
+     console.log(`Chat from ${displayName} (${senderId}): ${messageText}`);
      this.ui.showChatMessage(displayName, messageText);
   }
 
@@ -554,35 +572,140 @@ export class Game {
   addOtherPlayer(playerData) {
       if (!playerData || !playerData.id || this.otherPlayers[playerData.id]) {
          console.warn("Attempted to add invalid or existing player data", playerData);
-         return; // Already exists or invalid data
+         return;
       }
+      const playerName = playerData.name || `Player_${playerData.id.substring(0, 4)}`; 
       
-      // Create a simple mesh representation for the other player
-      // (Use a different color or model than the local player)
       const geometry = new THREE.CapsuleGeometry(0.5, 1.5, 4, 8);
-      const material = new THREE.MeshStandardMaterial({ color: 0xff6633 }); // Orange color
+      const material = new THREE.MeshStandardMaterial({ color: 0xff6633 }); 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(0, -100, 0); // Start off-screen until first update
-      if (playerData.state && playerData.state.position) {
-          mesh.position.fromArray(playerData.state.position);
+      mesh.position.set(0, -100, 0); 
+      const initialState = playerData.state || {};
+      if (initialState.position) {
+          mesh.position.fromArray(initialState.position);
       }
-      if (playerData.state && playerData.state.rotation) {
-          mesh.quaternion.fromArray(playerData.state.rotation);
+      if (initialState.rotation) {
+          mesh.quaternion.fromArray(initialState.rotation);
       }
       
+      // <<< CREATE and position name sprite >>>
+      const nameSprite = this.createNameSprite(playerName);
+      nameSprite.position.set(
+           mesh.position.x,
+           mesh.position.y + 2.5, // Adjust offset
+           mesh.position.z
+       );
+
       this.levelManager.scene.add(mesh);
-      this.otherPlayers[playerData.id] = { mesh: mesh, state: playerData.state || {} };
-      console.log(`Added visual for player ${playerData.id}`);
+      this.levelManager.scene.add(nameSprite); 
+      this.otherPlayers[playerData.id] = {
+          mesh: mesh,
+          nameSprite: nameSprite, 
+          state: initialState,
+          name: playerName 
+      };
+      console.log(`Added visual for player ${playerName} (${playerData.id})`);
   }
   
   removeOtherPlayer(playerId) {
      const otherPlayer = this.otherPlayers[playerId];
-     if (otherPlayer && otherPlayer.mesh) {
-        this.levelManager.scene.remove(otherPlayer.mesh);
-        console.log(`Removed visual for player ${playerId}`);
+     if (otherPlayer) { 
+        if (otherPlayer.mesh) {
+           this.levelManager.scene.remove(otherPlayer.mesh);
+        }
+        if (otherPlayer.nameSprite) {
+            // <<< Dispose texture and material when removing sprite >>>
+            if (otherPlayer.nameSprite.material.map) {
+                otherPlayer.nameSprite.material.map.dispose();
+            }
+            otherPlayer.nameSprite.material.dispose();
+            this.levelManager.scene.remove(otherPlayer.nameSprite);
+        }
+        console.log(`Removed visual for player ${otherPlayer.name || playerId}`);
      }
      delete this.otherPlayers[playerId];
   }
+
+  // <<< REWRITE Utility to create name sprite using CanvasTexture >>>
+  createNameSprite(text) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const fontSize = 24;
+      const fontFace = 'Arial';
+      context.font = `Bold ${fontSize}px ${fontFace}`;
+
+      // Measure text width for canvas size
+      const textMetrics = context.measureText(text);
+      const textWidth = textMetrics.width;
+
+      // Adjust canvas size (add padding)
+      canvas.width = textWidth + 20; // Add horizontal padding
+      canvas.height = fontSize + 10; // Add vertical padding
+
+      // Re-apply font settings after resize (important!)
+      context.font = `Bold ${fontSize}px ${fontFace}`;
+      context.fillStyle = 'rgba(255, 255, 255, 0.8)'; // White text, slightly transparent
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+
+      // Draw text in the center
+      context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      const material = new THREE.SpriteMaterial({ 
+          map: texture, 
+          sizeAttenuation: false, // Keep size constant regardless of distance
+          depthTest: false // Render on top
+       });
+      const sprite = new THREE.Sprite(material);
+
+      // Scale the sprite based on canvas aspect ratio
+      const spriteScaleFactor = 0.005; // <<< REDUCE Scale factor significantly
+      sprite.scale.set(canvas.width * spriteScaleFactor, canvas.height * spriteScaleFactor, 1.0);
+
+      return sprite;
+  }
+
+   // <<< REWRITE Utility to update name sprite texture >>>
+   updateNameSprite(sprite, newText) {
+        const canvas = document.createElement('canvas'); // Could reuse existing canvas if stored/managed
+        const context = canvas.getContext('2d');
+        const fontSize = 24;
+        const fontFace = 'Arial';
+        context.font = `Bold ${fontSize}px ${fontFace}`;
+        const textMetrics = context.measureText(newText);
+        const textWidth = textMetrics.width;
+        canvas.width = textWidth + 20;
+        canvas.height = fontSize + 10;
+
+        // Re-apply font settings
+        context.font = `Bold ${fontSize}px ${fontFace}`;
+        context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(newText, canvas.width / 2, canvas.height / 2);
+
+        const newTexture = new THREE.CanvasTexture(canvas);
+        newTexture.needsUpdate = true;
+
+        // Ensure sprite material exists
+        if (!sprite.material) {
+            sprite.material = new THREE.SpriteMaterial();
+        }
+
+        // Dispose old texture before assigning new one
+        if (sprite.material.map) {
+             sprite.material.map.dispose();
+        }
+        sprite.material.map = newTexture;
+        sprite.material.needsUpdate = true; // Important for material update
+
+        // Rescale sprite based on new text width
+        const spriteScaleFactor = 0.005; // <<< REDUCE Scale factor here too
+        sprite.scale.set(canvas.width * spriteScaleFactor, canvas.height * spriteScaleFactor, 1.0);
+   }
 
   // <<< ADD: Map Regeneration Logic >>>
   async regenerateLevel() {
