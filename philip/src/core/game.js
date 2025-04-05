@@ -149,16 +149,8 @@ export class Game {
   collectArtifact(artifactData) {
     this.state.artifacts++;
     // Apply artifact effect
-    if (artifactData.data.effect) {
-      this.applyArtifactEffect(artifactData.data.effect);
-
-      // Update objective if it's the first artifact
-      if (artifactData.data.effect.type === 'oxygen_efficiency') {
-        this.ui.setObjectiveText('Artifact found! Oxygen consumption reduced. Find a way deeper...');
-      } else {
-        // Generic update for other artifacts later
-        this.ui.setObjectiveText('Another artifact secured. The path continues downwards.');
-      }
+    if (artifactData.effect) {
+      this.applyArtifactEffect(artifactData.effect);
     }
     // Play collection sound
     this.audio.play('artifact_collect');
@@ -176,8 +168,7 @@ export class Game {
     // Apply various effects based on artifact type
     switch (effect.type) {
       case 'oxygen_efficiency':
-        // Improve oxygen efficiency (Actual effect logic TBD)
-        console.log('Oxygen Efficiency Artifact Effect Applied!');
+        // Improve oxygen efficiency
         break;
       case 'night_vision':
         // Enable night vision

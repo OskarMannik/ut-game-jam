@@ -14,7 +14,6 @@ export class UI {
     this.fadeOverlay = null;
     this.gameOverScreen = null;
     this.controlsDisplay = null;
-    this.objectiveDisplay = null;
   }
   
   init(gameState) {
@@ -34,7 +33,6 @@ export class UI {
     this.createFadeOverlay();
     this.createGameOverScreen();
     this.createControlsDisplay();
-    this.createObjectiveDisplay();
     
     // Add CSS
     this.addStyles();
@@ -229,16 +227,6 @@ export class UI {
       </ul>
     `;
     this.container.appendChild(this.controlsDisplay);
-  }
-  
-  createObjectiveDisplay() {
-    this.objectiveDisplay = document.createElement('div');
-    this.objectiveDisplay.className = 'objective-display';
-    this.objectiveDisplay.innerHTML = `
-      <h4>Objective</h4>
-      <p id="objective-text">Explore the depths and find the ancient artifact.</p>
-    `;
-    this.container.appendChild(this.objectiveDisplay);
   }
   
   addStyles() {
@@ -459,29 +447,6 @@ export class UI {
       .controls-display li {
         margin-bottom: 3px;
       }
-      
-      .objective-display {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background-color: rgba(0, 0, 0, 0.5);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        font-size: 14px;
-        font-family: sans-serif;
-        max-width: 200px;
-      }
-      
-      .objective-display h4 {
-        margin-top: 0;
-        margin-bottom: 5px;
-        text-align: center;
-      }
-      
-      .objective-display p {
-        margin: 0;
-      }
     `;
     
     document.head.appendChild(style);
@@ -579,12 +544,5 @@ export class UI {
   
   hideGameOver() {
     this.gameOverScreen.style.display = 'none';
-  }
-  
-  setObjectiveText(text) {
-    const objectiveTextElement = document.getElementById('objective-text');
-    if (objectiveTextElement) {
-      objectiveTextElement.textContent = text;
-    }
   }
 } 

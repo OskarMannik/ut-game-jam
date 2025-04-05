@@ -29,13 +29,10 @@ export class Biome {
         this.createSurfaceEnvironment(scene); // Default to surface
     }
     
-    // Combine ground and decorative objects for collision checking
-    const collisionObjects = [...this.groundObjects, ...this.decorativeObjects];
-
     // Return ground objects for collision detection and ground checks
     return {
         groundObjects: this.groundObjects,
-        collisionObjects: collisionObjects 
+        collisionObjects: this.decorativeObjects // Assuming decorations are also collision obstacles for now
     };
   }
   
