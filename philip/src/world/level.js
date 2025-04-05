@@ -21,17 +21,17 @@ export class LevelManager {
   }
   
   defineLevels() {
-    // Level 0: Surface - Starting area (now Ocean Surface)
+    // Level 0: Surface - Starting area
     this.levels.push({
       id: 0,
-      name: 'Ocean Surface',
-      type: 'ocean_surface', // Player physics = water
-      environmentType: 'surface', // Visuals = tropical surface
-      waterLevel: 100, // Player is always considered "underwater" for physics
-      playerStart: new THREE.Vector3(0, 0, 5), // Start slightly above water plane
+      name: 'Surface',
+      type: 'surface',
+      environmentType: 'surface',
+      waterLevel: -10, // Water is below the ground level
+      playerStart: new THREE.Vector3(0, 2, 0),
       entries: {
-        'start': new THREE.Vector3(0, 0, 5),
-        'return_from_underwater': new THREE.Vector3(10, 0, 20) // Emerge at Y=0
+        'start': new THREE.Vector3(0, 2, 0),
+        'return_from_underwater': new THREE.Vector3(10, 2, 20)
       }
     });
     

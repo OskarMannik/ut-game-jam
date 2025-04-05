@@ -121,14 +121,7 @@ export class Game {
       return; // Prioritize interaction transition
     }
 
-    // Check for swimming up to surface from underwater level
-    if (this.levelManager.currentLevel?.id === 1 && this.player.mesh.position.y > 0) {
-      console.log('Player swam to surface');
-      this.transitionToLevel(0, 'return_from_underwater');
-      return;
-    }
-
-    // Then, check for transitions based on proximity (portals)
+    // Then, check for transitions based on proximity
     const proximityTransition = this.levelManager.checkTransitionPoint(this.player.mesh.position);
     if (proximityTransition) {
       this.transitionToLevel(proximityTransition.targetLevel, proximityTransition.entryPoint);
@@ -142,12 +135,6 @@ export class Game {
     // Load new level
     await this.levelManager.loadLevel(levelIndex);
     
-    // Reset oxygen if transitioning to surface
-    if (levelIndex === 0) {
-      this.state.oxygen = 100;
-      console.log('Oxygen replenished upon reaching surface.');
-    }
-
     // Reposition player
     const newPosition = this.levelManager.getEntryPosition(entryPoint);
     this.player.setPosition(newPosition);

@@ -40,48 +40,31 @@ export class Biome {
   }
   
   createSurfaceEnvironment(scene) {
-    // Tropical Sky & Sun
-    scene.background = new THREE.Color(0x87CEEB); // Light Sky Blue
-    scene.fog = new THREE.Fog(0x87CEEB, 100, 350);
-
-    // Ocean Water Plane
-    const waterGeometry = new THREE.PlaneGeometry(500, 500);
-    const waterMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0077BE, // Ocean Blue
-      transparent: true,
-      opacity: 0.8,
-      metalness: 0.2,
-      roughness: 0.1,
-      side: THREE.DoubleSide
-    });
-    const waterPlane = new THREE.Mesh(waterGeometry, waterMaterial);
-    waterPlane.rotation.x = -Math.PI / 2;
-    waterPlane.position.y = -0.1; // Slightly below ground level
-    scene.add(waterPlane); // Add water first so ground is on top
-
-    // Main Island Ground (Sand)
-    const islandSize = 150;
-    this.createGround(scene, new THREE.Color(0xE0C29F), islandSize, false);
-
-    // Add Tropical Decorations
-    this.addTropicalDecorations(scene, islandSize);
-
-    // Add Lighting (Bright Sunlight)
-    scene.remove(...scene.children.filter(obj => obj.isLight)); // Clear previous lights
-    const sunLight = new THREE.DirectionalLight(0xFFFAD3, 1.5); // Warm sunlight
-    sunLight.position.set(100, 150, 80);
+    // Sky background
+    scene.background = new THREE.Color(0x7db6d5);
+    scene.fog = new THREE.Fog(0x7db6d5, 50, 200);
+    
+    // Ground
+    this.createGround(scene, new THREE.Color(0x55aa55), 250, true);
+    
+    // Add some trees and rocks
+    this.addSurfaceDecorations(scene);
+    
+    // Add lighting (directional sunlight)
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    sunLight.position.set(50, 100, 50);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 500;
-    sunLight.shadow.camera.left = -150;
-    sunLight.shadow.camera.right = 150;
-    sunLight.shadow.camera.top = 150;
-    sunLight.shadow.camera.bottom = -150;
+    sunLight.shadow.camera.left = -100;
+    sunLight.shadow.camera.right = 100;
+    sunLight.shadow.camera.top = 100;
+    sunLight.shadow.camera.bottom = -100;
     scene.add(sunLight);
-
-    const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.6);
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
   }
   
@@ -722,91 +705,5 @@ export class Biome {
     // In a real implementation, this would use THREE.js particle systems
     // For this demo, we'll just log that we would add these particles
     console.log('Would add cosmic particle systems');
-  }
-
-  // --- TROPICAL DECORATIONS ---
-  addTropicalDecorations(scene, islandSize) {
-    const radius = islandSize / 2;
-
-    // Add Palm Trees
-    for (let i = 0; i < 25; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * (radius - 10) + 5; // Avoid edge and center
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
-      
-      const tree = this.createPalmTree();
-      tree.position.set(x, 0, z);
-      tree.rotation.y = Math.random() * Math.PI * 2;
-      scene.add(tree);
-      this.decorativeObjects.push(tree); 
-    }
-
-    // Add Rocks/Boulders
-    for (let i = 0; i < 40; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * radius;
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
-      
-      const rock = this.createTropicalRock();
-      rock.position.set(x, 0, z);
-      rock.rotation.set(Math.random(), Math.random(), Math.random());
-      scene.add(rock);
-      this.decorativeObjects.push(rock);
-    }
-  }
-
-  createPalmTree() {
-    const group = new THREE.Group();
-
-    // Trunk
-    const trunkHeight = Math.random() * 4 + 6; // 6-10m tall
-    const trunkRadius = 0.2;
-    const trunkGeometry = new THREE.CylinderGeometry(trunkRadius * 1.2, trunkRadius, trunkHeight, 8);
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x966F33 }); // Brown
-    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    trunk.position.y = trunkHeight / 2;
-    trunk.castShadow = true;
-    group.add(trunk);
-
-    // Leaves (Fronds)
-    const numFronds = 8;
-    const frondLength = 3;
-    const frondShape = new THREE.Shape();
-    frondShape.moveTo(0, 0);
-    frondShape.quadraticCurveTo(frondLength / 2, 0.5, frondLength, 0);
-    frondShape.quadraticCurveTo(frondLength / 2, -0.5, 0, 0);
-
-    const extrudeSettings = { depth: 0.1, bevelEnabled: false };
-    const frondGeometry = new THREE.ExtrudeGeometry(frondShape, extrudeSettings);
-    const frondMaterial = new THREE.MeshStandardMaterial({ color: 0x2E8B57, side: THREE.DoubleSide }); // Sea Green
-
-    for (let i = 0; i < numFronds; i++) {
-      const frond = new THREE.Mesh(frondGeometry, frondMaterial);
-      const angle = (i / numFronds) * Math.PI * 2;
-      frond.position.set(0, trunkHeight - 0.5, 0);
-      frond.rotation.y = angle;
-      frond.rotation.x = Math.PI / 4 + (Math.random() - 0.5) * 0.2; // Angle downwards
-      frond.castShadow = true;
-      group.add(frond);
-    }
-
-    return group;
-  }
-
-  createTropicalRock() {
-    const size = Math.random() * 1.5 + 0.5; // 0.5 to 2 units size
-    const detail = Math.random() < 0.5 ? 0 : 1; // Simple or slightly more detailed
-    const geometry = new THREE.IcosahedronGeometry(size, detail);
-    const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(0xAAAAAA).lerp(new THREE.Color(0x888888), Math.random()), // Grey variation
-        roughness: 0.8,
-        metalness: 0.1
-    });
-    const rock = new THREE.Mesh(geometry, material);
-    rock.castShadow = true;
-    rock.receiveShadow = true; // Can receive shadows from trees
-    return rock;
   }
 } 
