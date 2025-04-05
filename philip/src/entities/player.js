@@ -64,7 +64,7 @@ export class Player {
     playerGroup.add(head);
     
     // Light source (lamp/torch)
-    const light = new THREE.PointLight(0xffffcc, 1, 10);
+    const light = new THREE.PointLight(0xffffdd, 2.0, 20);
     light.position.set(0, 1.5, 0.8); // Light in front of player
     playerGroup.add(light);
     

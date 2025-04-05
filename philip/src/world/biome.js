@@ -66,21 +66,27 @@ export class Biome {
   }
   
   createUnderwaterEnvironment(scene) {
+    console.log("[Biome] Creating Underwater Environment...");
     // Underwater blue
     scene.background = new THREE.Color(0x0a4a80);
     scene.fog = new THREE.FogExp2(0x0a4a80, 0.03);
+    console.log("[Biome] Background and Fog set.");
     
     // Sandy bottom
     this.createGround(scene, new THREE.Color(0xddcc88), 300, false);
+    console.log("[Biome] Ground created. Ground objects count:", this.groundObjects.length);
     
     // Add coral, rocks, underwater plants
     this.addUnderwaterDecorations(scene);
+    console.log("[Biome] Underwater decorations added.");
     
     // Add caustics effect (simulated light patterns)
     this.addCausticsEffect(scene);
+    console.log("[Biome] Caustics effect added.");
     
     // Add underwater particles (bubbles, floating debris)
     this.addUnderwaterParticles(scene);
+    console.log("[Biome] Underwater particles added.");
     
     // Underwater lighting
     const waterLight = new THREE.DirectionalLight(0x0077ff, 0.5);
@@ -104,25 +110,35 @@ export class Biome {
       );
       scene.add(light);
     }
+    console.log("[Biome] Underwater lighting added.");
+    console.log("[Biome] Underwater Environment Creation COMPLETE.");
   }
   
   createCaveEnvironment(scene) {
-    // Dark cave
-    scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.FogExp2(0x000000, 0.05);
+    console.log("[Biome] Creating Cave Environment...");
+    // Dark cave - Changed background/fog to greyish-blue
+    const caveColor = new THREE.Color(0x1a2a3a);
+    scene.background = caveColor;
+    scene.fog = new THREE.FogExp2(caveColor, 0.025);
+    console.log("[Biome] Cave Background and Fog set.");
     
     // Rocky ground
     this.createGround(scene, new THREE.Color(0x555555), 200, false);
+    console.log("[Biome] Cave Ground created. Ground objects count:", this.groundObjects.length);
     
     // Add cave features (stalactites, stalagmites, rock formations)
     this.addCaveDecorations(scene);
+    console.log("[Biome] Cave decorations added.");
     
     // Add minimal lighting (mostly from point lights)
-    const dimAmbient = new THREE.AmbientLight(0x222222, 0.5);
+    const dimAmbient = new THREE.AmbientLight(0x333340, 1.0);
     scene.add(dimAmbient);
+    console.log("[Biome] Cave ambient light added.");
     
     // Add some glowing crystals for light
     this.addCaveCrystals(scene);
+    console.log("[Biome] Cave crystals (with lights) added.");
+    console.log("[Biome] Cave Environment Creation COMPLETE.");
   }
   
   createCosmicEnvironment(scene) {
@@ -216,6 +232,7 @@ export class Biome {
   }
   
   addUnderwaterDecorations(scene) {
+    console.log("[Biome] addUnderwaterDecorations START");
     // Add coral formations
     for (let i = 0; i < 30; i++) {
       const coral = this.createCoral();
@@ -256,6 +273,7 @@ export class Biome {
       scene.add(rock);
       this.decorativeObjects.push(rock);
     }
+    console.log("[Biome] addUnderwaterDecorations END");
   }
   
   addCaveDecorations(scene) {
@@ -493,23 +511,22 @@ export class Biome {
     return formationGroup;
   }
   
-  createCaveCrystals() {
-    const crystalsGroup = new THREE.Group();
-    
+  addCaveCrystals(scene) {
+    console.log("[Biome] addCaveCrystals START");
     // Add glowing crystals for light
     for (let i = 0; i < 30; i++) {
-      const crystal = this.createCrystal();
+      const crystalGroup = this.createCrystal();
       
-      crystal.position.set(
+      crystalGroup.position.set(
         (Math.random() - 0.5) * 150,
         Math.random() * 20,
         (Math.random() - 0.5) * 150
       );
       
-      this.decorativeObjects.push(crystal);
+      scene.add(crystalGroup);
+      this.decorativeObjects.push(crystalGroup);
     }
-    
-    return crystalsGroup;
+    console.log("[Biome] addCaveCrystals END");
   }
   
   createCrystal() {
@@ -535,7 +552,7 @@ export class Biome {
     crystalGroup.add(crystal);
     
     // Add point light inside crystal
-    const light = new THREE.PointLight(color, 1, 5);
+    const light = new THREE.PointLight(color, 1.5, 25);
     crystalGroup.add(light);
     
     return crystalGroup;
@@ -687,15 +704,15 @@ export class Biome {
   // ENVIRONMENTAL EFFECTS
   
   addCausticsEffect(scene) {
-    // In a real implementation, this would use shader effects or animated textures
-    // For this demo, we'll just log that we would add this effect
-    console.log('Would add underwater caustics effect');
+    console.log("[Biome] addCausticsEffect START (Placeholder)");
+    // Placeholder - Implement actual caustics effect later
+    console.log("[Biome] addCausticsEffect END (Placeholder)");
   }
   
   addUnderwaterParticles(scene) {
-    // In a real implementation, this would use THREE.js particle systems
-    // For this demo, we'll just log that we would add these particles
-    console.log('Would add underwater particle systems (bubbles, debris)');
+    console.log("[Biome] addUnderwaterParticles START (Placeholder)");
+    // Placeholder - Implement particle systems later
+    console.log("[Biome] addUnderwaterParticles END (Placeholder)");
   }
   
   addCosmicParticles(scene) {

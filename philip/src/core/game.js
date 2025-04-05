@@ -99,12 +99,12 @@ export class Game {
     
     // Only deplete oxygen when below a certain depth (deeper than 2 units)
     if (this.state.depth > 2) {
-      // Deplete oxygen faster based on depth
-      const depletionRate = 1 + ((this.state.depth - 2) * 0.2);
+      // Deplete oxygen faster based on depth - reduced rate increase
+      const depletionRate = 1 + ((this.state.depth - 2) * 0.1); // Reduced multiplier from 0.2
       this.state.oxygen = Math.max(0, this.state.oxygen - (depletionRate * deltaTime));
     } else {
-      // Replenish oxygen when near the surface
-      this.state.oxygen = Math.min(100, this.state.oxygen + (10 * deltaTime));
+      // Replenish oxygen when near the surface - increased rate
+      this.state.oxygen = Math.min(100, this.state.oxygen + (12 * deltaTime)); // Increased from 10
     }
     
     // Check for game over
