@@ -1398,6 +1398,7 @@ export class UI {
     chatInput.type = 'text';
     chatInput.placeholder = 'Type message...';
     chatInput.className = 'chat-input';
+    chatInput.id = 'chat-input-field';
     chatInput.maxLength = 100; // Limit message length
     this.chatUI.input = chatInput;
 

@@ -16,6 +16,9 @@ export class InputManager {
     // Track active touches on buttons
     this.activeTouches = {}; // Store touch identifiers mapped to action names
     
+    // Reference to chat input
+    this.chatInputElement = null;
+    
     // Key mappings (can be customized later)
     this.keyMappings = {
       'w': 'forward',
@@ -38,7 +41,9 @@ export class InputManager {
     this.handleKeyUp = this.handleKeyUp.bind(this);
   }
   
-  init() {
+  init(chatInputElement = null) {
+    this.chatInputElement = chatInputElement;
+    
     // Register event listeners
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
@@ -51,22 +56,33 @@ export class InputManager {
   }
   
   handleKeyDown(event) {
+    if (this.chatInputElement && document.activeElement === this.chatInputElement) {
+      // If chat input is focused, let browser handle typing normally.
+      // Only potentially intercept 'Enter' if needed elsewhere, but chat UI handles it.
+      return; // Don't process game keys
+    }
+    
     const key = event.key;
     
     // Check if the key is mapped
     if (this.keyMappings[key] !== undefined) {
       this.inputState[this.keyMappings[key]] = true;
-      event.preventDefault(); // Prevent default browser actions
+      event.preventDefault(); // Prevent default ONLY when using key for game action
     }
   }
   
   handleKeyUp(event) {
+    if (this.chatInputElement && document.activeElement === this.chatInputElement) {
+      // If chat input is focused, let browser handle typing normally.
+      return; // Don't process game keys
+    }
+    
     const key = event.key;
     
     // Check if the key is mapped
     if (this.keyMappings[key] !== undefined) {
       this.inputState[this.keyMappings[key]] = false;
-      event.preventDefault(); // Prevent default browser actions
+      event.preventDefault(); // Prevent default ONLY when using key for game action
     }
   }
   

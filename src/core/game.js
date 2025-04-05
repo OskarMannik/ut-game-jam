@@ -60,8 +60,11 @@ export class Game {
     // Initialize systems
     await this.audio.init();
     this.renderer.init();
-    this.input.init();
     this.ui.init(this.state);
+    
+    // <<< Pass chat input element to InputManager >>>
+    const chatInputElement = this.ui.chatUI.input; // Get the element from UI
+    this.input.init(chatInputElement); // Pass it during initialization
     
     // <<< ADD: Fetch and Display Initial High Scores >>>
     if (this.supabase && typeof this.supabase.getHighScores === 'function') {
