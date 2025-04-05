@@ -14,23 +14,24 @@ export class LevelManager {
     this.movableObjects = [];
     this.collisionObjects = [];
     this.transitionPoints = [];
+    this.groundObjects = []; // Store ground objects for ground check
     
     // Define the different levels/biomes in the game
     this.defineLevels();
   }
   
   defineLevels() {
-    // Level 0: Surface - Starting area
+    // Level 0: Surface - Starting area (now Ocean Surface)
     this.levels.push({
       id: 0,
-      name: 'Surface',
-      type: 'surface',
-      environmentType: 'surface',
-      waterLevel: -10, // Water is below the ground level
-      playerStart: new THREE.Vector3(0, 2, 0),
+      name: 'Ocean Surface',
+      type: 'ocean_surface', // Player physics = water
+      environmentType: 'surface', // Visuals = tropical surface
+      waterLevel: 100, // Player is always considered "underwater" for physics
+      playerStart: new THREE.Vector3(0, 0, 5), // Start slightly above water plane
       entries: {
-        'start': new THREE.Vector3(0, 2, 0),
-        'return_from_underwater': new THREE.Vector3(10, 2, 20)
+        'start': new THREE.Vector3(0, 0, 5),
+        'return_from_underwater': new THREE.Vector3(10, 0, 20) // Emerge at Y=0
       }
     });
     
@@ -129,7 +130,9 @@ export class LevelManager {
     
     // Create the environment based on level type
     const biome = new Biome(this.currentLevel.environmentType);
-    biome.createEnvironment(this.scene);
+    const environmentData = biome.createEnvironment(this.scene);
+    this.collisionObjects = environmentData.collisionObjects || [];
+    this.groundObjects = environmentData.groundObjects || []; // Store ground objects for ground check
     
     // Add collectibles specific to this level
     this.addLevelCollectibles(levelIndex);

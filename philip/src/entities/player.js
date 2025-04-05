@@ -7,7 +7,12 @@ export class Player {
     this.turnSpeed = 2.5;
     this.jumpForce = 15;
     this.gravity = 30;
-    this.swimSpeed = 5;
+    this.swimSpeed = 3.5;
+    this.backwardSwimMultiplier = 0.7;
+    this.verticalSwimMultiplier = 3.6;
+    this.underwaterTurnMultiplier = 0.45;
+    this.underwaterDrag = 0.92;
+    this.underwaterIdleSinkRate = 0.5; // Rate at which player sinks when idle
     this.isUnderwater = false;
     this.canTelekinesis = false;
     
@@ -93,6 +98,10 @@ export class Player {
   update(deltaTime, inputState, levelManager) {
     if (!levelManager) return;
     
+    // Reset collected items and interaction requests for this frame
+    this.collectedItemsThisFrame = [];
+    this.requestedTransition = null;
+    
     // Check if player is underwater
     this.isUnderwater = levelManager.isPositionUnderwater ? 
       levelManager.isPositionUnderwater(this.mesh.position) : false;
@@ -101,7 +110,7 @@ export class Player {
     if (this.isUnderwater) {
       this.updateUnderwaterMovement(deltaTime, inputState);
     } else {
-      this.updateLandMovement(deltaTime, inputState);
+      this.updateLandMovement(deltaTime, inputState, levelManager);
     }
     
     // Update player position based on velocity
@@ -133,9 +142,9 @@ export class Player {
     }
   }
   
-  updateLandMovement(deltaTime, inputState) {
+  updateLandMovement(deltaTime, inputState, levelManager) {
     // Check if player is grounded
-    this.checkGrounded();
+    this.checkGrounded(levelManager);
     
     // Reset horizontal velocity
     this.velocity.x = 0;
@@ -181,7 +190,7 @@ export class Player {
   
   updateUnderwaterMovement(deltaTime, inputState) {
     // Different physics underwater (smoother movement, lower gravity)
-    this.velocity.multiplyScalar(0.9); // Water resistance
+    this.velocity.multiplyScalar(this.underwaterDrag); // Apply water resistance
     
     // Calculate forward direction based on player rotation
     const forward = new THREE.Vector3(0, 0, 1);
@@ -196,61 +205,92 @@ export class Player {
       this.velocity.add(forward.multiplyScalar(this.swimSpeed));
     }
     if (inputState.backward) {
-      this.velocity.add(forward.multiplyScalar(-this.swimSpeed * 0.7));
+      this.velocity.add(forward.multiplyScalar(-this.swimSpeed * this.backwardSwimMultiplier));
     }
     if (inputState.left) {
-      this.mesh.rotation.y += this.turnSpeed * 0.7 * deltaTime;
+      this.mesh.rotation.y += this.turnSpeed * this.underwaterTurnMultiplier * deltaTime;
     }
     if (inputState.right) {
-      this.mesh.rotation.y -= this.turnSpeed * 0.7 * deltaTime;
+      this.mesh.rotation.y -= this.turnSpeed * this.underwaterTurnMultiplier * deltaTime;
     }
     
     // Swim up/down
     if (inputState.jump) {
-      this.velocity.y += this.swimSpeed * 0.8 * deltaTime;
+      this.velocity.y += this.swimSpeed * this.verticalSwimMultiplier * deltaTime; // Swim up
+    } else if (inputState.down) {
+      this.velocity.y -= this.swimSpeed * this.verticalSwimMultiplier * deltaTime; // Swim down
     } else {
-      // Slight downward drift when not actively swimming up
-      this.velocity.y -= this.gravity * 0.1 * deltaTime;
+      // Apply a gentle downward drift when not actively swimming up or down
+      this.velocity.y -= this.underwaterIdleSinkRate * deltaTime;
     }
   }
   
-  checkGrounded() {
+  checkGrounded(levelManager) {
     // Update ray origin to match player position
     this.groundRay.ray.origin.copy(this.mesh.position);
+    
+    // Get ground objects from the level manager
+    const groundObjects = levelManager && levelManager.groundObjects ? levelManager.groundObjects : [];
     
     // Default to not grounded if no ground objects available
     this.isGrounded = false;
     
     // Skip raycasting if we don't have any ground objects
-    // This will be replaced later when we have proper ground objects
-    return;
+    if (!groundObjects || groundObjects.length === 0) {
+      return;
+    }
     
     // Cast ray downwards to check for ground
-    // const intersects = this.groundRay.intersectObjects(/* ground objects would be passed here */);
+    const intersects = this.groundRay.intersectObjects(groundObjects, false); // false for non-recursive
     
-    // if (intersects.length > 0) {
-    //   this.isGrounded = true;
-    // } else {
-    //   this.isGrounded = false;
-    // }
+    if (intersects.length > 0 && intersects[0].distance <= 2) { // Check distance
+      this.isGrounded = true;
+    } else {
+      this.isGrounded = false;
+    }
   }
   
   handleCollisions(levelManager) {
-    // Check for collisions with level geometry
-    const collisions = levelManager.checkCollisions ? levelManager.checkCollisions(this.hitbox) : [];
+    // Get collision objects from the level manager
+    const collisionObjects = levelManager && levelManager.collisionObjects ? levelManager.collisionObjects : [];
     
-    if (collisions && collisions.length > 0) {
-      // Resolve collisions by adjusting player position
-      collisions.forEach(collision => {
-        if (collision && collision.normal && typeof collision.depth === 'number') {
-          // Move player away from collision
-          this.mesh.position.add(collision.normal.multiplyScalar(collision.depth));
-        }
-      });
-      
-      // Update hitbox
-      this.hitbox.setFromObject(this.mesh);
+    // Skip collision check if no objects
+    if (!collisionObjects || collisionObjects.length === 0) {
+      return;
     }
+    
+    // Check for collisions with level geometry
+    const collisions = [];
+    collisionObjects.forEach(object => {
+      if (!object || !object.geometry || !object.matrixWorld) return; // Skip invalid objects
+      const objectHitbox = new THREE.Box3().setFromObject(object);
+      if (this.hitbox.intersectsBox(objectHitbox)) {
+        // Basic collision resolution: Push player back along collision normal
+        // This is a very simple approach and might need refinement
+        const collisionNormal = new THREE.Vector3();
+        const playerCenter = new THREE.Vector3();
+        const objectCenter = new THREE.Vector3();
+        this.hitbox.getCenter(playerCenter);
+        objectHitbox.getCenter(objectCenter);
+
+        collisionNormal.subVectors(playerCenter, objectCenter).normalize();
+
+        // Calculate penetration depth (approximation)
+        const playerSize = new THREE.Vector3();
+        const objectSize = new THREE.Vector3();
+        this.hitbox.getSize(playerSize);
+        objectHitbox.getSize(objectSize);
+        const minSeparation = (playerSize.x + objectSize.x) * 0.5; // Example for X axis
+        const currentSeparation = Math.abs(playerCenter.x - objectCenter.x);
+        const depth = minSeparation - currentSeparation > 0 ? minSeparation - currentSeparation : 0;
+        
+        // Push player out by the depth along the normal
+        this.mesh.position.addScaledVector(collisionNormal, depth * 1.05); // Add slight overshoot
+      }
+    });
+
+    // Re-update hitbox after position adjustment
+    this.hitbox.setFromObject(this.mesh);
   }
   
   checkCollectibles(levelManager) {
@@ -262,8 +302,15 @@ export class Player {
     
     // Collect them if close enough
     collectibles.forEach(collectible => {
-      levelManager.collectItem(collectible.id);
+      const itemData = levelManager.collectItem(collectible.id);
+      if (itemData) {
+        this.collectedItemsThisFrame.push(itemData);
+      }
     });
+  }
+  
+  getCollectedItems() {
+    return this.collectedItemsThisFrame || [];
   }
   
   interact(levelManager) {
@@ -274,8 +321,15 @@ export class Player {
     );
     
     if (interactiveObject) {
-      interactiveObject.interact();
+      const transitionData = interactiveObject.interact();
+      if (transitionData) {
+        this.requestedTransition = transitionData;
+      }
     }
+  }
+  
+  getRequestedTransition() {
+    return this.requestedTransition;
   }
   
   useTelekinesis(levelManager) {

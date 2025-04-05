@@ -50,16 +50,20 @@ export class Renderer {
   updateCamera() {
     if (!this.followTarget) return;
 
-    // Calculate desired camera position based on target and offset
     const targetPosition = new THREE.Vector3();
     this.followTarget.getWorldPosition(targetPosition);
-    
-    const cameraTargetPosition = targetPosition.clone().add(this.cameraOffset);
-    
+
+    const playerQuaternion = new THREE.Quaternion();
+    this.followTarget.getWorldQuaternion(playerQuaternion);
+
+    // Apply the offset based on the player's rotation
+    const rotatedOffset = this.cameraOffset.clone().applyQuaternion(playerQuaternion);
+    const cameraTargetPosition = targetPosition.clone().add(rotatedOffset);
+
     // Smooth camera movement (lerp)
     this.camera.position.lerp(cameraTargetPosition, 0.1);
-    
-    // Look at player
+
+    // Look at the player's position
     this.camera.lookAt(targetPosition);
   }
 

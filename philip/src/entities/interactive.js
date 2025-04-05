@@ -138,11 +138,11 @@ export class InteractiveObject {
   }
   
   interact() {
-    // Trigger the interaction callback
     if (this.interactCallback) {
+      // Execute the callback and return its result
       return this.interactCallback();
-    }
-    return null;
+    } 
+    return null; // Return null if no callback
   }
   
   // Method to change the portal's appearance based on destination

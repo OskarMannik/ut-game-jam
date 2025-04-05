@@ -13,6 +13,8 @@ export class UI {
     this.memoryFlashback = null;
     this.fadeOverlay = null;
     this.gameOverScreen = null;
+    this.controlsDisplay = null;
+    this.objectiveDisplay = null;
   }
   
   init(gameState) {
@@ -31,6 +33,8 @@ export class UI {
     this.createMemoryFlashback();
     this.createFadeOverlay();
     this.createGameOverScreen();
+    this.createControlsDisplay();
+    this.createObjectiveDisplay();
     
     // Add CSS
     this.addStyles();
@@ -206,6 +210,35 @@ export class UI {
     
     this.gameOverScreen.appendChild(content);
     document.body.appendChild(this.gameOverScreen);
+  }
+  
+  createControlsDisplay() {
+    this.controlsDisplay = document.createElement('div');
+    this.controlsDisplay.className = 'controls-display';
+    this.controlsDisplay.innerHTML = `
+      <h4>Controls</h4>
+      <ul>
+        <li><strong>W/↑:</strong> Forward</li>
+        <li><strong>S/↓:</strong> Backward</li>
+        <li><strong>A/←:</strong> Turn Left</li>
+        <li><strong>D/→:</strong> Turn Right</li>
+        <li><strong>Space:</strong> Jump / Swim Up</li>
+        <li><strong>Z:</strong> Swim Down</li>
+        <li><strong>E:</strong> Interact</li>
+        <li><strong>F:</strong> Use Ability</li>
+      </ul>
+    `;
+    this.container.appendChild(this.controlsDisplay);
+  }
+  
+  createObjectiveDisplay() {
+    this.objectiveDisplay = document.createElement('div');
+    this.objectiveDisplay.className = 'objective-display';
+    this.objectiveDisplay.innerHTML = `
+      <h4>Objective</h4>
+      <p id="objective-text">Explore the depths and find the ancient artifact.</p>
+    `;
+    this.container.appendChild(this.objectiveDisplay);
   }
   
   addStyles() {
@@ -398,6 +431,57 @@ export class UI {
       .restart-button:hover {
         background-color: #ff6666;
       }
+      
+      .controls-display {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-family: sans-serif;
+      }
+      
+      .controls-display h4 {
+        margin-top: 0;
+        margin-bottom: 5px;
+        text-align: center;
+      }
+      
+      .controls-display ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+      
+      .controls-display li {
+        margin-bottom: 3px;
+      }
+      
+      .objective-display {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-family: sans-serif;
+        max-width: 200px;
+      }
+      
+      .objective-display h4 {
+        margin-top: 0;
+        margin-bottom: 5px;
+        text-align: center;
+      }
+      
+      .objective-display p {
+        margin: 0;
+      }
     `;
     
     document.head.appendChild(style);
@@ -495,5 +579,12 @@ export class UI {
   
   hideGameOver() {
     this.gameOverScreen.style.display = 'none';
+  }
+  
+  setObjectiveText(text) {
+    const objectiveTextElement = document.getElementById('objective-text');
+    if (objectiveTextElement) {
+      objectiveTextElement.textContent = text;
+    }
   }
 } 

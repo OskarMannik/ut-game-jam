@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
   game.init().then(() => {
     console.log('Game started successfully');
     
+    // Hide the initial loading screen
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) {
+      loadingElement.style.display = 'none';
+    }
+    
     // Add control instructions to the page
     addControlInstructions();
   }).catch(error => {

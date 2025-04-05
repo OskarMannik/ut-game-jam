@@ -67,6 +67,16 @@ export class Game {
     this.player.update(deltaTime, this.input.getInputState(), this.levelManager);
     this.levelManager.update(deltaTime, this.player);
     
+    // Process collected items
+    const collectedItems = this.player.getCollectedItems();
+    collectedItems.forEach(itemData => {
+      if (itemData.type === 'artifact') {
+        this.collectArtifact(itemData);
+      } else if (itemData.type === 'memory') {
+        this.collectMemory(itemData);
+      }
+    });
+
     // Update oxygen based on depth
     this.updateGameState(deltaTime);
     
@@ -104,9 +114,24 @@ export class Game {
   }
   
   checkLevelTransition() {
-    const transitionPoint = this.levelManager.checkTransitionPoint(this.player.mesh.position);
-    if (transitionPoint) {
-      this.transitionToLevel(transitionPoint.targetLevel, transitionPoint.entryPoint);
+    // Check for transition requested by interaction first
+    const interactionTransition = this.player.getRequestedTransition();
+    if (interactionTransition) {
+      this.transitionToLevel(interactionTransition.targetLevel, interactionTransition.entryPoint);
+      return; // Prioritize interaction transition
+    }
+
+    // Check for swimming up to surface from underwater level
+    if (this.levelManager.currentLevel?.id === 1 && this.player.mesh.position.y > 0) {
+      console.log('Player swam to surface');
+      this.transitionToLevel(0, 'return_from_underwater');
+      return;
+    }
+
+    // Then, check for transitions based on proximity (portals)
+    const proximityTransition = this.levelManager.checkTransitionPoint(this.player.mesh.position);
+    if (proximityTransition) {
+      this.transitionToLevel(proximityTransition.targetLevel, proximityTransition.entryPoint);
     }
   }
   
@@ -117,6 +142,12 @@ export class Game {
     // Load new level
     await this.levelManager.loadLevel(levelIndex);
     
+    // Reset oxygen if transitioning to surface
+    if (levelIndex === 0) {
+      this.state.oxygen = 100;
+      console.log('Oxygen replenished upon reaching surface.');
+    }
+
     // Reposition player
     const newPosition = this.levelManager.getEntryPosition(entryPoint);
     this.player.setPosition(newPosition);
@@ -131,8 +162,16 @@ export class Game {
   collectArtifact(artifactData) {
     this.state.artifacts++;
     // Apply artifact effect
-    if (artifactData.effect) {
-      this.applyArtifactEffect(artifactData.effect);
+    if (artifactData.data.effect) {
+      this.applyArtifactEffect(artifactData.data.effect);
+
+      // Update objective if it's the first artifact
+      if (artifactData.data.effect.type === 'oxygen_efficiency') {
+        this.ui.setObjectiveText('Artifact found! Oxygen consumption reduced. Find a way deeper...');
+      } else {
+        // Generic update for other artifacts later
+        this.ui.setObjectiveText('Another artifact secured. The path continues downwards.');
+      }
     }
     // Play collection sound
     this.audio.play('artifact_collect');
@@ -150,7 +189,8 @@ export class Game {
     // Apply various effects based on artifact type
     switch (effect.type) {
       case 'oxygen_efficiency':
-        // Improve oxygen efficiency
+        // Improve oxygen efficiency (Actual effect logic TBD)
+        console.log('Oxygen Efficiency Artifact Effect Applied!');
         break;
       case 'night_vision':
         // Enable night vision

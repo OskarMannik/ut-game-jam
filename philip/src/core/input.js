@@ -6,6 +6,7 @@ export class InputManager {
       left: false,
       right: false,
       jump: false,
+      down: false,
       action: false,
       interact: false
     };
@@ -21,6 +22,7 @@ export class InputManager {
       'd': 'right',
       'ArrowRight': 'right',
       ' ': 'jump',
+      'z': 'down',
       'e': 'interact',
       'f': 'action'
     };
