@@ -11,7 +11,7 @@ import { NetworkManager } from './network.js';
 const WEBSOCKET_URL = 'wss://vibegame-game-server.onrender.com'; // <<< UPDATED
 
 export class Game {
-  constructor() {
+  constructor(playerName = "Anon") { // <<< ACCEPT playerName >>>
     this.clock = new THREE.Clock();
     this.renderer = new Renderer();
     this.input = new InputManager();
@@ -28,6 +28,7 @@ export class Game {
     // <<< ADD Multiplayer State >>>
     this.network = null;
     this.clientId = null;
+    this.playerName = playerName; // <<< STORE playerName >>>
     this.otherPlayers = {}; // Store other players' data/meshes { id: { mesh, state } }
     this.lastNetworkUpdate = 0; // Timer for throttling network updates
     this.networkUpdateInterval = 100; // Send updates every 100ms
@@ -66,7 +67,7 @@ export class Game {
     // Get player start position with a fallback
     const startPosition = this.levelManager.getPlayerStartPosition() || new THREE.Vector3(0, 2, 0);
     this.initialPlayerPosition = startPosition.clone();
-    this.player = new Player(startPosition);
+    this.player = new Player(startPosition, this.playerName); // <<< PASS Name >>>
     
     // Add player to the scene
     this.levelManager.scene.add(this.player.mesh);
@@ -206,6 +207,17 @@ export class Game {
           // Don't return here, let the rest of the frame process before potential async reload
        }
     }
+
+    // Update other player name sprite positions (after local player update)
+    Object.values(this.otherPlayers).forEach(otherPlayer => {
+       if (otherPlayer.mesh && otherPlayer.nameSprite) {
+           otherPlayer.nameSprite.position.set(
+               otherPlayer.mesh.position.x,
+               otherPlayer.mesh.position.y + 2.5, // Keep offset consistent
+               otherPlayer.mesh.position.z
+           );
+       }
+    });
   }
   
   updateGameState(deltaTime) {
@@ -447,7 +459,7 @@ export class Game {
       position: this.player.mesh.position.toArray(),
       rotation: this.player.mesh.quaternion.toArray(), // Send quaternion for rotation
       health: this.player.currentHealth, // Include health
-      // Add any other relevant state: isJumping, isFalling, animationState etc.
+      name: this.playerName // <<< ADD name >>>
     };
     
     this.network.send('playerStateUpdate', stateToSend);
@@ -468,7 +480,7 @@ export class Game {
     
     this.network.send('chatMessage', { text: sanitizedMessage });
     // Optionally display own message immediately
-    this.ui.showChatMessage(this.clientId.substring(0, 6), sanitizedMessage); // Show shortened ID
+    this.ui.showChatMessage(this.playerName, sanitizedMessage); // Use full name locally
   }
 
   // <<< ADD: Handlers for Network Messages >>>

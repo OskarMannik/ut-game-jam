@@ -2,8 +2,15 @@ import { Game } from './core/game.js';
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
-  // Create and initialize our game
-  const game = new Game();
+  // Ask for username
+  let playerName = prompt("Please enter your name:", "Player");
+  if (!playerName || playerName.trim().length === 0) {
+    playerName = `Player_${Math.random().toString(36).substring(2, 7)}`; // Generate random if empty
+  }
+  playerName = playerName.substring(0, 16); // Limit length
+
+  // Create and initialize our game, passing the name
+  const game = new Game(playerName);
   
   // Store game instance globally for debugging and UI access
   window.game = game;
@@ -19,5 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(error => {
     console.error('Error starting game:', error);
+    // Display error to user maybe?
   });
 }); 
