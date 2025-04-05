@@ -66,8 +66,6 @@ export class Game {
     
     // Maybe play a general ambient track?
     this.audio.playMusic('surface', { volume: 0.4 }); // Play surface music quieter
-    
-    console.log('Game initialized');
   }
 
   update() {
@@ -158,16 +156,12 @@ export class Game {
       } else if (itemData.type === 'memory') {
         this.collectMemory(itemData);
       } else if (itemData.type === 'health') {
-        console.log("Processing health pickup:", itemData);
         this.player.heal(50); // Heal 50%
       }
     });
 
     // Update game state (only checks win/lose now)
     this.updateGameState(deltaTime);
-
-    // <<< ADD Log: Check state right before passing to UI >>>
-    console.log("Game state before UI update:", JSON.stringify(this.state));
 
     // Update UI (non-dialogue parts)
     this.ui.update(this.state);
@@ -187,12 +181,7 @@ export class Game {
     // <<< ADD: Update player health in game state >>>
     if (this.player && this.player.getHealthState) {
       const healthData = this.player.getHealthState(); // Get the data
-      console.log("Inside updateGameState: Got health data:", JSON.stringify(healthData)); // Log what we got
       this.state.playerHealth = healthData; // Assign it
-      console.log("Inside updateGameState: State playerHealth is now:", JSON.stringify(this.state.playerHealth)); // Log the result
-    } else {
-      // <<< ADD Log >>>
-      console.log("Inside updateGameState: Condition failed (player or getHealthState missing)");
     }
 
     // Increment Timer 
@@ -273,7 +262,6 @@ export class Game {
     const fallThreshold = 10; // Only penalize falls greater than 10 units
     const fallPenaltyMultiplier = 50; // Points lost per unit fallen over threshold
     const fallPenalty = Math.max(0, (this.player.maxFallDistanceThisSession - fallThreshold)) * fallPenaltyMultiplier;
-    console.log(`Calculating score: MaxFall=${this.player.maxFallDistanceThisSession.toFixed(2)}, FallPenalty=${fallPenalty.toFixed(0)}, ArtifactBonus=${artifactBonus}`);
     
     this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty); 
     
@@ -347,7 +335,6 @@ export class Game {
       this.audio.resumeAudio(); // <<< Use new method
       this.ui.hidePauseScreen(); // Hide UI overlay
     }
-    console.log(`Game ${this.isUserPaused ? 'paused' : 'resumed'}`);
   }
 
   // <<< MODIFY: Check Win Condition >>>
@@ -369,7 +356,6 @@ export class Game {
 
   gameWon() {
     if (!this.isRunning) return; 
-    console.log("GAME WON!");
     this.isRunning = false;
     this.state.gameWon = true;
     
@@ -379,7 +365,6 @@ export class Game {
     const fallThreshold = 10; 
     const fallPenaltyMultiplier = 50; 
     const fallPenalty = Math.max(0, (this.player.maxFallDistanceThisSession - fallThreshold)) * fallPenaltyMultiplier;
-    console.log(`Calculating score: MaxFall=${this.player.maxFallDistanceThisSession.toFixed(2)}, FallPenalty=${fallPenalty.toFixed(0)}, ArtifactBonus=${artifactBonus}`);
     
     this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty);
       
@@ -390,7 +375,6 @@ export class Game {
 
   // <<< MODIFY: Player Respawn Logic >>>
   respawnPlayer(reason = 'unknown') {
-    console.log(`Respawning player due to: ${reason}`);
     if (!this.player || !this.initialPlayerPosition) {
       console.error("Cannot respawn: Player or initial position missing. Triggering full game over.");
       this.gameOver('respawn_error');
@@ -413,5 +397,10 @@ export class Game {
 
     // Optional: Add a small visual/audio cue for respawn
     this.audio.play('player_respawn'); // Assuming you have a sound named 'player_respawn'
+
+    // <<< ADD: Reset player health on respawn >>>
+    if (this.player && this.player.maxHealth) {
+      this.player.currentHealth = this.player.maxHealth;
+    }
   }
 } 

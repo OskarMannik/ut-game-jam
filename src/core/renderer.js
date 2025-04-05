@@ -11,26 +11,54 @@ export class Renderer {
       enabled: false,
       composer: null
     };
+    this.scene = null;
+    this.ambientLight = null;
+    this.directionalLight = null;
+    this.fog = null;
+    this.enablePostProcessing = false;
+    this.composer = null;
+    this.nightVisionPass = null;
+
+    // Bind methods
+    this.onWindowResize = this.onWindowResize.bind(this);
   }
 
   init() {
-    // Create WebGL renderer
+    // Renderer setup
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(this.renderer.domElement);
 
-    // Create camera
+    // Camera setup
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
+    this.camera.position.set(0, 5, 10);
 
-    // Handle window resize
-    window.addEventListener('resize', this.onWindowResize.bind(this));
+    // Lighting
+    this.ambientLight = new THREE.AmbientLight(0x404040, 1.0);
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    this.directionalLight.position.set(5, 10, 7.5);
+    this.directionalLight.castShadow = true;
+    this.directionalLight.shadow.mapSize.width = 1024;
+    this.directionalLight.shadow.mapSize.height = 1024;
+    this.directionalLight.shadow.camera.near = 0.5;
+    this.directionalLight.shadow.camera.far = 50;
+    this.directionalLight.shadow.camera.left = -20;
+    this.directionalLight.shadow.camera.right = 20;
+    this.directionalLight.shadow.camera.top = 20;
+    this.directionalLight.shadow.camera.bottom = -20;
+
+    // Fog
+    this.fog = new THREE.Fog(0x000020, 10, 150);
+    
+    window.addEventListener('resize', this.onWindowResize, false);
   }
 
   setFollowTarget(target) {
@@ -38,13 +66,19 @@ export class Renderer {
   }
 
   onWindowResize() {
+    if (!this.camera || !this.renderer) return;
+
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
+
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    
-    if (this.postProcessing.enabled && this.postProcessing.composer) {
-      this.postProcessing.composer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+
+    if (this.composer) {
+      this.composer.setSize(window.innerWidth, window.innerHeight);
     }
+    
+    console.log(`Window resized: ${window.innerWidth}x${window.innerHeight}`);
   }
 
   updateCamera() {

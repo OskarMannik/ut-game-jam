@@ -21,6 +21,7 @@ export class UI {
     this.gameWonScreen = null;
     this.crosshair = null;
     this.healthBar = null;
+    this.touchControls = {};
     
     this.isFading = false;
     this.activeMemoryTimeout = null;
@@ -61,11 +62,10 @@ export class UI {
     this.createPauseScreen();
     this.createGameWonScreen();
     this.createCrosshair();
+    this.createTouchControls();
     
     // Add CSS
     this.addStyles();
-    
-    console.log('UI initialized');
   }
   
   createDepthMeter() {
@@ -328,6 +328,51 @@ export class UI {
     this.crosshair = document.createElement('div');
     this.crosshair.className = 'crosshair';
     document.body.appendChild(this.crosshair);
+  }
+  
+  createTouchControls() {
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!isTouchDevice) {
+        return; // Don't create controls if not a touch device
+    }
+
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'touch-controls-container';
+
+    // Movement Buttons (Left Side)
+    const moveContainer = document.createElement('div');
+    moveContainer.className = 'touch-move-container';
+    this.touchControls.forward = this.createTouchButton('▲', 'forward', moveContainer);
+    const leftRightContainer = document.createElement('div');
+    leftRightContainer.className = 'touch-left-right';
+    this.touchControls.left = this.createTouchButton('◄', 'left', leftRightContainer);
+    this.touchControls.right = this.createTouchButton('►', 'right', leftRightContainer);
+    moveContainer.appendChild(leftRightContainer);
+    this.touchControls.backward = this.createTouchButton('▼', 'backward', moveContainer);
+
+    // Action Buttons (Right Side)
+    const actionContainer = document.createElement('div');
+    actionContainer.className = 'touch-action-container';
+    this.touchControls.jump = this.createTouchButton('JUMP', 'jump', actionContainer); // Or an icon
+    this.touchControls.interact = this.createTouchButton('E', 'interact', actionContainer);
+    this.touchControls.action = this.createTouchButton('F', 'action', actionContainer);
+    // Maybe a pause button?
+    this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer);
+
+
+    controlsContainer.appendChild(moveContainer);
+    controlsContainer.appendChild(actionContainer);
+    document.body.appendChild(controlsContainer); // Append to body to overlay game canvas
+  }
+
+  // Helper to create a single touch button
+  createTouchButton(text, actionName, parentElement) {
+    const button = document.createElement('div');
+    button.className = `touch-button touch-${actionName}`;
+    button.textContent = text;
+    button.dataset.action = actionName; // Store action name for input manager
+    parentElement.appendChild(button);
+    return button;
   }
   
   addStyles() {
@@ -799,6 +844,69 @@ export class UI {
         transition: width 0.3s ease-out;
         border-radius: 2px;
       }
+
+      /* <<< ADD: Touch Control Styles >>> */
+      .touch-controls-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 150px; /* Adjust height as needed */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        box-sizing: border-box;
+        pointer-events: none; /* Allow clicks/touches to pass through container */
+        z-index: 100; /* Ensure controls are above canvas */
+      }
+
+      .touch-move-container,
+      .touch-action-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: auto; /* Enable touch on button areas */
+      }
+      
+      .touch-action-container {
+         align-items: flex-end; /* Align action buttons to the right */
+      }
+      
+      .touch-left-right {
+          display: flex;
+          width: 100%;
+          justify-content: space-between;
+      }
+
+      .touch-button {
+        background-color: rgba(100, 100, 100, 0.5);
+        color: white;
+        border: 2px solid rgba(255, 255, 255, 0.7);
+        border-radius: 50%; /* Circular buttons */
+        width: 50px;
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 16px;
+        font-weight: bold;
+        margin: 5px;
+        cursor: pointer;
+        user-select: none; /* Prevent text selection */
+        -webkit-user-select: none;
+        touch-action: manipulation; /* Prevent double-tap zoom etc. */
+      }
+      
+       /* Specific button positioning/sizing if needed */
+      .touch-jump {
+         width: 60px;
+         height: 60px;
+      }
+
+      .touch-button:active {
+        background-color: rgba(200, 200, 200, 0.7);
+      }
     `;
     
     document.head.appendChild(style);
@@ -827,10 +935,8 @@ export class UI {
     if (this.healthBar && this.healthBar.fill && gameState.playerHealth) {
       const current = gameState.playerHealth.current;
       const max = gameState.playerHealth.max;
-      console.log(`UI Update Health: Current=${current}, Max=${max}`);
 
       const healthPercent = (current / max) * 100;
-      console.log(`UI Update Health: Percent=${healthPercent.toFixed(2)}%`);
 
       this.healthBar.fill.style.width = `${Math.max(0, healthPercent)}%`;
 
@@ -842,12 +948,6 @@ export class UI {
       } else {
         this.healthBar.fill.style.backgroundColor = '#4CAF50'; // Green when high
       }
-    } else {
-      console.log("UI Update Health: Condition not met!", {
-         hasHealthBar: !!this.healthBar,
-         hasFill: !!this.healthBar?.fill,
-         hasPlayerHealth: !!gameState.playerHealth
-       });
     }
   }
   

@@ -1,5 +1,6 @@
 export class InputManager {
   constructor() {
+    this.keys = {};
     this.inputState = {
       forward: false,
       backward: false,
@@ -11,6 +12,9 @@ export class InputManager {
       interact: false,
       pause: false
     };
+    
+    // Track active touches on buttons
+    this.activeTouches = {}; // Store touch identifiers mapped to action names
     
     // Key mappings (can be customized later)
     this.keyMappings = {
@@ -39,7 +43,11 @@ export class InputManager {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
     
-    console.log('Input manager initialized');
+    // Touch event listeners
+    const touchTarget = document.body; // Listen on body to catch events bubbled from buttons
+    touchTarget.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+    touchTarget.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
+    touchTarget.addEventListener('touchcancel', this.onTouchEnd.bind(this), { passive: false }); // Treat cancel like end
   }
   
   handleKeyDown(event) {
@@ -82,5 +90,46 @@ export class InputManager {
   cleanup() {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+  }
+  
+  // Touch Start Handler
+  onTouchStart(event) {
+    event.preventDefault(); // Prevent default touch actions like scrolling/zooming
+    const changedTouches = event.changedTouches;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const touch = changedTouches[i];
+      const targetElement = touch.target;
+
+      // Check if the touch started on one of our buttons
+      if (targetElement.classList.contains('touch-button')) {
+        const action = targetElement.dataset.action;
+        if (action && !this.activeTouches[touch.identifier]) {
+           this.inputState[action] = true;
+           this.activeTouches[touch.identifier] = action; // Track this touch
+        }
+      }
+    }
+    // Update state immediately (useful for single-press actions like pause/interact)
+    this.updateInputState(); 
+  }
+  
+  // Touch End/Cancel Handler
+  onTouchEnd(event) {
+    event.preventDefault();
+    const changedTouches = event.changedTouches;
+    for (let i = 0; i < changedTouches.length; i++) {
+      const touch = changedTouches[i];
+      const action = this.activeTouches[touch.identifier];
+
+      if (action) {
+        this.inputState[action] = false;
+        delete this.activeTouches[touch.identifier]; // Stop tracking this touch
+      }
+    }
+    this.updateInputState();
+  }
+  
+  updateInputState() {
+    // Implement the logic to update the input state based on touch events
   }
 } 
