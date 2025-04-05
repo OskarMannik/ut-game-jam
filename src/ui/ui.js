@@ -22,6 +22,7 @@ export class UI {
     this.crosshair = null;
     this.healthBar = null;
     this.touchControls = {};
+    this.chatUI = {};
     
     this.isFading = false;
     this.activeMemoryTimeout = null;
@@ -63,6 +64,7 @@ export class UI {
     this.createGameWonScreen();
     this.createCrosshair();
     this.createTouchControls();
+    this.createChatUI();
     
     // Add CSS
     this.addStyles();
@@ -907,6 +909,73 @@ export class UI {
       .touch-button:active {
         background-color: rgba(200, 200, 200, 0.7);
       }
+
+      /* <<< ADD: Chat Styles >>> */
+      .chat-container {
+          position: fixed;
+          bottom: 20px; /* Position above touch controls if they exist */
+          left: 20px;
+          width: 300px; /* Adjust width */
+          height: 200px; /* Adjust height */
+          display: flex;
+          flex-direction: column;
+          background-color: rgba(0, 0, 0, 0.6);
+          border-radius: 5px;
+          overflow: hidden;
+          z-index: 90; /* Below touch controls, above canvas */
+          font-size: 14px;
+      }
+
+      .chat-messages {
+          flex-grow: 1;
+          list-style: none;
+          padding: 10px;
+          margin: 0;
+          overflow-y: auto; /* Enable scrolling for messages */
+          color: white;
+          word-wrap: break-word;
+      }
+      
+      .chat-messages li {
+          margin-bottom: 5px;
+          transition: opacity 2s ease-out;
+      }
+      
+      .chat-sender {
+          font-weight: bold;
+          color: #aaa; /* Different color for sender ID/Name */
+          margin-right: 5px;
+      }
+
+      .chat-input-container {
+          display: flex;
+          border-top: 1px solid #444;
+      }
+
+      .chat-input {
+          flex-grow: 1;
+          padding: 8px;
+          border: none;
+          background-color: rgba(255, 255, 255, 0.1);
+          color: white;
+          outline: none;
+      }
+      
+      .chat-input::placeholder {
+          color: #ccc;
+      }
+
+      .chat-send-button {
+          padding: 8px 12px;
+          border: none;
+          background-color: #444;
+          color: white;
+          cursor: pointer;
+      }
+      
+      .chat-send-button:hover {
+          background-color: #555;
+      }
     `;
     
     document.head.appendChild(style);
@@ -1196,5 +1265,76 @@ export class UI {
         }, 500); // Matches transition duration
       }
     }, duration);
+  }
+
+  // <<< ADD: Create Chat UI Elements >>>
+  createChatUI() {
+    const chatContainer = document.createElement('div');
+    chatContainer.className = 'chat-container';
+
+    const messageList = document.createElement('ul');
+    messageList.className = 'chat-messages';
+    this.chatUI.messages = messageList;
+
+    const inputContainer = document.createElement('div');
+    inputContainer.className = 'chat-input-container';
+
+    const chatInput = document.createElement('input');
+    chatInput.type = 'text';
+    chatInput.placeholder = 'Type message...';
+    chatInput.className = 'chat-input';
+    chatInput.maxLength = 100; // Limit message length
+    this.chatUI.input = chatInput;
+
+    const sendButton = document.createElement('button');
+    sendButton.textContent = 'Send';
+    sendButton.className = 'chat-send-button';
+    this.chatUI.sendButton = sendButton;
+
+    // Event listener for sending
+    const sendMessage = () => {
+      const message = chatInput.value.trim();
+      if (message && window.game && typeof window.game.sendChatMessage === 'function') {
+        window.game.sendChatMessage(message);
+        chatInput.value = ''; // Clear input
+      }
+    };
+
+    sendButton.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    inputContainer.appendChild(chatInput);
+    inputContainer.appendChild(sendButton);
+    chatContainer.appendChild(messageList);
+    chatContainer.appendChild(inputContainer);
+
+    // Append chat container to the main UI container or body
+    // Appending to body might be better to avoid overlap issues
+    document.body.appendChild(chatContainer);
+  }
+
+  // <<< ADD: Method to display a chat message >>>
+  showChatMessage(sender, message) {
+    if (!this.chatUI.messages) return;
+
+    const messageElement = document.createElement('li');
+    messageElement.innerHTML = `<span class="chat-sender">${sender}:</span> ${message}`; // Basic formatting
+    
+    this.chatUI.messages.appendChild(messageElement);
+
+    // Auto-scroll to bottom
+    this.chatUI.messages.scrollTop = this.chatUI.messages.scrollHeight;
+
+    // Optional: Fade out old messages after some time
+    setTimeout(() => {
+       if (messageElement) {
+           messageElement.style.opacity = '0.5'; 
+           // Could remove entirely after longer timeout
+       }
+    }, 15000); // Start fading after 15 seconds
   }
 } 

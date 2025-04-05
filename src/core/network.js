@@ -75,6 +75,11 @@ export class NetworkManager {
             this.game.handlePlayerUpdate(message.payload.id, message.payload.state);
          }
         break;
+      case 'chatMessage':
+          if (this.clientId && message.payload.senderId && this.game && typeof this.game.handleChatMessage === 'function') {
+             this.game.handleChatMessage(message.payload.senderId, message.payload.text);
+          }
+          break;
       default:
         console.log(`Unhandled message type: ${message.type}`);
     }

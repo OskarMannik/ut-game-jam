@@ -453,6 +453,24 @@ export class Game {
     this.network.send('playerStateUpdate', stateToSend);
   }
   
+  // <<< ADD: Send Chat Message >>>
+  sendChatMessage(message) {
+    if (!this.network || !this.clientId) {
+      console.warn("Cannot send chat message: Network not ready.");
+      return;
+    }
+    if (!message || message.length === 0 || message.length > 100) {
+      console.warn("Cannot send empty or too long chat message.");
+      return;
+    }
+    // Basic sanitization (can be improved)
+    const sanitizedMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    this.network.send('chatMessage', { text: sanitizedMessage });
+    // Optionally display own message immediately
+    this.ui.showChatMessage(this.clientId.substring(0, 6), sanitizedMessage); // Show shortened ID
+  }
+
   // <<< ADD: Handlers for Network Messages >>>
   setClientId(id) {
      this.clientId = id;
@@ -503,6 +521,15 @@ export class Game {
     }
   }
   
+  // <<< ADD: Handle incoming chat messages >>>
+  handleChatMessage(senderId, messageText) {
+     if (senderId === this.clientId) return; // Already displayed own message
+     console.log(`Chat from ${senderId}: ${messageText}`);
+     // Use a shortened version of the sender ID for display
+     const displayName = senderId.substring(0, 6);
+     this.ui.showChatMessage(displayName, messageText);
+  }
+
   handleDisconnect() {
       console.warn("Disconnected from server.");
       // Clear other players on disconnect
