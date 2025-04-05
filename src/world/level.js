@@ -90,15 +90,16 @@ export class LevelManager {
   }
   
   addLevelCollectibles(levelIndex) {
-    if (levelIndex !== 0 || this.generatedPlatforms.length < 8) { // Need at least 8 platforms for 4 artifacts + 4 memories
-        console.warn("Cannot add collectibles: Not on descent level or not enough platforms generated.");
+    const requiredPlatformCount = 10; // 4 artifacts + 4 memories + 2 health
+    if (levelIndex !== 0 || this.generatedPlatforms.length < requiredPlatformCount + 1) { // +1 for the start platform
+        console.warn(`Cannot add collectibles: Not on descent level or not enough platforms generated (need ${requiredPlatformCount + 1}). Found: ${this.generatedPlatforms.length}`);
         return;
     }
 
     // Exclude the first platform from collectible placement
     const eligiblePlatforms = this.generatedPlatforms.slice(1);
-    if (eligiblePlatforms.length < 8) {
-        console.warn("Not enough eligible platforms (excluding the first) to place all collectibles.");
+    if (eligiblePlatforms.length < requiredPlatformCount) {
+        console.warn(`Not enough eligible platforms (excluding the first) to place all collectibles (need ${requiredPlatformCount}). Found: ${eligiblePlatforms.length}`);
         return; // Or adjust logic to place fewer items
     }
 
@@ -107,6 +108,7 @@ export class LevelManager {
     const artifactIds = ['surface_artifact_1', 'surface_artifact_2', 'underwater_artifact_1', 'underwater_artifact_2'];
     const artifactEffects = ['oxygen_efficiency', 'night_vision', 'telekinesis', 'oxygen_efficiency']; // Match IDs
     const memoryIds = ['surface_memory_1', 'surface_memory_2', 'underwater_memory_1', 'underwater_memory_2'];
+    const healthPickupIds = ['health_1', 'health_2']; // <<< ADD: IDs for health pickups
     
     let platformIndex = 0;
 
@@ -132,6 +134,19 @@ export class LevelManager {
         const collectiblePos = platformPos.add(new THREE.Vector3(0, platformHeight / 2 + 1.5, 0)); // Place 1.5 units above platform center
         this.addCollectible(collectiblePos, 'memory', memoryIds[i]);
         console.log(` - Added ${memoryIds[i]} at`, collectiblePos);
+    }
+
+    // <<< ADD: Place Health Pickups >>>
+    console.log(`Placing ${healthPickupIds.length} health pickups...`);
+    for (let i = 0; i < healthPickupIds.length; i++) {
+        if (platformIndex >= eligiblePlatforms.length) break; // Safety check
+        const platform = eligiblePlatforms[platformIndex++];
+        const platformPos = platform.position.clone();
+        const platformHeight = platform.geometry.parameters.height || 0.5;
+        const collectiblePos = platformPos.add(new THREE.Vector3(0, platformHeight / 2 + 1.5, 0)); // Place 1.5 units above platform center
+        // Call addCollectible with type 'health'
+        this.addCollectible(collectiblePos, 'health', healthPickupIds[i]); 
+        console.log(` - Added ${healthPickupIds[i]} at`, collectiblePos);
     }
   }
   

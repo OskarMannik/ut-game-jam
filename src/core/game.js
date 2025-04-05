@@ -19,6 +19,7 @@ export class Game {
     this.isPaused = false;
     this.isUserPaused = false;
     this.interactingNPC = null;
+    this.initialPlayerPosition = null;
     
     // Game state
     this.state = {
@@ -27,6 +28,7 @@ export class Game {
       collectedMemories: [],
       depth: 0,
       gameTimer: 0,
+      playerHealth: null,
       gameOverReason: null,
       gameWon: false,
       finalScore: 0
@@ -48,6 +50,7 @@ export class Game {
     
     // Get player start position with a fallback
     const startPosition = this.levelManager.getPlayerStartPosition() || new THREE.Vector3(0, 2, 0);
+    this.initialPlayerPosition = startPosition.clone();
     this.player = new Player(startPosition);
     
     // Add player to the scene
@@ -136,6 +139,15 @@ export class Game {
     
     // Normal game updates only if NOT starting dialogue
     this.player.update(deltaTime, inputState, this.levelManager);
+
+    // <<< MODIFY: Check for player death and respawn >>>
+    if (this.player.checkIfDead()) {
+      this.respawnPlayer('death_by_fall'); // Use new reason
+      // Skip the rest of the update for this frame after respawn
+      requestAnimationFrame(this.update);
+      return;
+    }
+
     this.levelManager.update(deltaTime, this.player);
     
     // Process collected items
@@ -145,12 +157,18 @@ export class Game {
         this.collectArtifact(itemData);
       } else if (itemData.type === 'memory') {
         this.collectMemory(itemData);
+      } else if (itemData.type === 'health') {
+        console.log("Processing health pickup:", itemData);
+        this.player.heal(50); // Heal 50%
       }
     });
 
-    // <<< SIMPLIFY: Update game state (only checks win/lose now) >>>
+    // Update game state (only checks win/lose now)
     this.updateGameState(deltaTime);
-    
+
+    // <<< ADD Log: Check state right before passing to UI >>>
+    console.log("Game state before UI update:", JSON.stringify(this.state));
+
     // Update UI (non-dialogue parts)
     this.ui.update(this.state);
     
@@ -165,6 +183,17 @@ export class Game {
     // <<< MODIFY: Calculate Depth from first platform surface (145.5) >>>
     const firstPlatformTopY = 145.5; // Platform center Y (145) + half height (0.5)
     this.state.depth = Math.max(0, firstPlatformTopY - this.player.mesh.position.y);
+
+    // <<< ADD: Update player health in game state >>>
+    if (this.player && this.player.getHealthState) {
+      const healthData = this.player.getHealthState(); // Get the data
+      console.log("Inside updateGameState: Got health data:", JSON.stringify(healthData)); // Log what we got
+      this.state.playerHealth = healthData; // Assign it
+      console.log("Inside updateGameState: State playerHealth is now:", JSON.stringify(this.state.playerHealth)); // Log the result
+    } else {
+      // <<< ADD Log >>>
+      console.log("Inside updateGameState: Condition failed (player or getHealthState missing)");
+    }
 
     // Increment Timer 
     if (!this.isUserPaused && !this.isPaused) { 
@@ -265,6 +294,7 @@ export class Game {
       collectedMemories: [],
       depth: 0, 
       gameTimer: 0, 
+      playerHealth: null,
       gameOverReason: null,
       gameWon: false,
       finalScore: 0 
@@ -354,7 +384,34 @@ export class Game {
     this.state.finalScore = Math.max(0, 10000 + artifactBonus - fallPenalty);
       
     this.audio.stopMusic(); 
-    // this.audio.play('game_win_sound');
+    this.audio.play('game_win_sound');
     this.ui.showGameWon(this.state); // Pass updated state
+  }
+
+  // <<< MODIFY: Player Respawn Logic >>>
+  respawnPlayer(reason = 'unknown') {
+    console.log(`Respawning player due to: ${reason}`);
+    if (!this.player || !this.initialPlayerPosition) {
+      console.error("Cannot respawn: Player or initial position missing. Triggering full game over.");
+      this.gameOver('respawn_error');
+      return;
+    }
+
+    // <<< MODIFY: Use player's internal reset method >>>
+    this.player.resetForRespawn();
+
+    // Move player back to start
+    this.player.setPosition(this.initialPlayerPosition);
+
+    // Briefly show a message via UI
+    this.ui.showTemporaryMessage("Respawning...", 2000); // Simpler message
+
+    // Ensure game continues running
+    this.isRunning = true;
+    this.isPaused = false;
+    this.isUserPaused = false;
+
+    // Optional: Add a small visual/audio cue for respawn
+    this.audio.play('player_respawn'); // Assuming you have a sound named 'player_respawn'
   }
 } 

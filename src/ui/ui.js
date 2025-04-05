@@ -20,6 +20,7 @@ export class UI {
     this.pauseScreen = null;
     this.gameWonScreen = null;
     this.crosshair = null;
+    this.healthBar = null;
     
     this.isFading = false;
     this.activeMemoryTimeout = null;
@@ -45,6 +46,9 @@ export class UI {
     
     this.createTimerDisplay();
     if (this.timerDisplay) hudContainer.appendChild(this.timerDisplay.container);
+
+    this.createHealthBar();
+    if (this.healthBar) hudContainer.appendChild(this.healthBar.container);
     
     // Create other UI elements (append directly to body or container as appropriate)
     this.createInteractionPrompt();
@@ -98,6 +102,28 @@ export class UI {
     container.appendChild(valueElement);
 
     this.timerDisplay = { container, value: valueElement };
+  }
+  
+  createHealthBar() {
+    const container = document.createElement('div');
+    container.className = 'ui-element health-container';
+
+    const label = document.createElement('div');
+    label.className = 'ui-label';
+    label.textContent = 'HEALTH';
+
+    const barBackground = document.createElement('div');
+    barBackground.className = 'health-bar-background';
+
+    const barFill = document.createElement('div');
+    barFill.className = 'health-bar-fill';
+    barFill.style.width = '100%'; // Start full
+
+    barBackground.appendChild(barFill);
+    container.appendChild(label);
+    container.appendChild(barBackground);
+
+    this.healthBar = { container, fill: barFill };
   }
   
   createInteractionPrompt() {
@@ -751,6 +777,28 @@ export class UI {
         pointer-events: none;
         display: none;
       }
+
+      .health-container {
+        width: 150px;
+      }
+
+      .health-bar-background {
+        width: 100%;
+        height: 12px;
+        background-color: #555;
+        border: 1px solid #888;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 4px;
+      }
+
+      .health-bar-fill {
+        height: 100%;
+        background-color: #4CAF50;
+        width: 100%;
+        transition: width 0.3s ease-out;
+        border-radius: 2px;
+      }
     `;
     
     document.head.appendChild(style);
@@ -773,6 +821,33 @@ export class UI {
         } else {
             this.timerDisplay.container.classList.remove('low-time');
         }
+    }
+
+    // Update Health Bar
+    if (this.healthBar && this.healthBar.fill && gameState.playerHealth) {
+      const current = gameState.playerHealth.current;
+      const max = gameState.playerHealth.max;
+      console.log(`UI Update Health: Current=${current}, Max=${max}`);
+
+      const healthPercent = (current / max) * 100;
+      console.log(`UI Update Health: Percent=${healthPercent.toFixed(2)}%`);
+
+      this.healthBar.fill.style.width = `${Math.max(0, healthPercent)}%`;
+
+      // Optional: Change color based on health percentage
+      if (healthPercent < 30) {
+        this.healthBar.fill.style.backgroundColor = '#f44336'; // Red when low
+      } else if (healthPercent < 60) {
+        this.healthBar.fill.style.backgroundColor = '#ffeb3b'; // Yellow when medium
+      } else {
+        this.healthBar.fill.style.backgroundColor = '#4CAF50'; // Green when high
+      }
+    } else {
+      console.log("UI Update Health: Condition not met!", {
+         hasHealthBar: !!this.healthBar,
+         hasFill: !!this.healthBar?.fill,
+         hasPlayerHealth: !!gameState.playerHealth
+       });
     }
   }
   
@@ -976,5 +1051,50 @@ export class UI {
       if (this.gameWonScreen) {
           this.gameWonScreen.style.display = 'none';
       }
+  }
+
+  // <<< ADD: Function to show a temporary message >>>
+  showTemporaryMessage(message, duration = 2000) {
+    if (this.tempMessageElement) {
+      // Remove any existing temporary message immediately
+      this.tempMessageElement.remove();
+      if (this.tempMessageTimeout) {
+        clearTimeout(this.tempMessageTimeout);
+      }
+    }
+
+    this.tempMessageElement = document.createElement('div');
+    this.tempMessageElement.className = 'temporary-message';
+    this.tempMessageElement.textContent = message;
+
+    // Basic styling (can be moved to CSS)
+    this.tempMessageElement.style.position = 'fixed';
+    this.tempMessageElement.style.bottom = '20px';
+    this.tempMessageElement.style.left = '50%';
+    this.tempMessageElement.style.transform = 'translateX(-50%)';
+    this.tempMessageElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    this.tempMessageElement.style.color = 'white';
+    this.tempMessageElement.style.padding = '10px 20px';
+    this.tempMessageElement.style.borderRadius = '5px';
+    this.tempMessageElement.style.zIndex = '1001'; // Above other UI
+    this.tempMessageElement.style.textAlign = 'center';
+    this.tempMessageElement.style.transition = 'opacity 0.5s ease-out';
+    this.tempMessageElement.style.opacity = '1';
+
+    document.body.appendChild(this.tempMessageElement);
+
+    this.tempMessageTimeout = setTimeout(() => {
+      if (this.tempMessageElement) {
+        this.tempMessageElement.style.opacity = '0';
+        // Remove element after fade out transition
+        setTimeout(() => {
+          if (this.tempMessageElement) {
+             this.tempMessageElement.remove();
+             this.tempMessageElement = null;
+             this.tempMessageTimeout = null;
+          }
+        }, 500); // Matches transition duration
+      }
+    }, duration);
   }
 } 

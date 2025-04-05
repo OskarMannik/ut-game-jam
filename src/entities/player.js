@@ -8,6 +8,7 @@ export class Player {
     this.jumpForce = 15;
     this.highJumpForceMultiplier = 1.4; // Multiplier for high jump
     this.gravity = 30;
+    this.maxHealth = 100;          // Maximum health
     this.canTelekinesis = false;
     
     // Player state
@@ -15,10 +16,13 @@ export class Player {
     this.isGrounded = false;
     this.isJumping = false;
     this.isFalling = false;
+    this.isDead = false; // Flag for zero health state
+    this.currentHealth = this.maxHealth; // Current health, start at max
     this.currentDialogue = null; // To hold dialogue data from interaction
     this.currentFallDistance = 0; // Track current fall
     this.maxFallDistanceThisSession = 0; // Track max fall in session
     this.hasHighJump = false; // Ability state
+    this.jumpStartY = null; // Track Y position at the start of a jump
     
     // Step sound timing
     this.stepTimer = 0;
@@ -179,6 +183,7 @@ export class Player {
         this.velocity.y = effectiveJumpForce;
         this.isJumping = true;
         this.isGrounded = false;
+        this.jumpStartY = this.mesh.position.y; // Record Y position on jump
         window.game?.audio.play('player_jump'); 
         if (this.hasHighJump) {
             console.log("High Jump!");
@@ -200,12 +205,54 @@ export class Player {
       if (this.isFalling) { // Landed after falling
         // Update Max Fall Distance
         this.maxFallDistanceThisSession = Math.max(this.maxFallDistanceThisSession, this.currentFallDistance);
-        console.log(`Landed! Current Fall: ${this.currentFallDistance.toFixed(2)}, Max Fall: ${this.maxFallDistanceThisSession.toFixed(2)}`);
-        window.game?.audio.play('player_step', { volume: 0.6 }); // Play step sound on landing
+        console.log(`Landed! Acc. Fall: ${this.currentFallDistance.toFixed(2)}, Max Acc. Fall: ${this.maxFallDistanceThisSession.toFixed(2)}`);
+
+        // Determine effective fall distance for damage calculation
+        let effectiveFallDistance = this.currentFallDistance;
+        let fallType = "Walked Off";
+        if (this.jumpStartY !== null) {
+          fallType = "Jump";
+          const netVerticalDrop = Math.max(0, this.jumpStartY - this.mesh.position.y);
+          effectiveFallDistance = netVerticalDrop; // Use net drop for jump falls
+          console.log(`  -> Jump Fall Detected: StartY=${this.jumpStartY.toFixed(2)}, EndY=${this.mesh.position.y.toFixed(2)}, NetDrop=${netVerticalDrop.toFixed(2)}`);
+        } else {
+           console.log(`  -> Walk/Fall Detected`);
+        }
+
+        // Detailed logging before damage calculation (using effective distance)
+        console.log(`Landing details (${fallType}): 
+          Effective Fall Distance: ${effectiveFallDistance.toFixed(4)}, 
+          Health Before Damage: ${this.currentHealth}, 
+          Thresholds: >10=${effectiveFallDistance > 10}, >15=${effectiveFallDistance > 15}, >20=${effectiveFallDistance > 20}`);
+
+        // Calculate and apply fall damage based on EFFECTIVE distance
+        let fallDamage = 0;
+        if (effectiveFallDistance > 20) { // Deadly fall
+          fallDamage = this.maxHealth; // Instant death
+          console.log(`Fatal fall detected! Eff. Distance: ${effectiveFallDistance.toFixed(2)}`);
+          window.game?.audio.play('player_fall_damage'); // Use a fatal fall sound
+        } else if (effectiveFallDistance > 15) { // 75% damage
+          fallDamage = Math.floor(this.maxHealth * 0.75);
+          console.log(`Major fall damage! Eff. Distance: ${effectiveFallDistance.toFixed(2)}, Damage: ${fallDamage}`);
+          window.game?.audio.play('player_hurt'); // Use a hurt sound
+        } else if (effectiveFallDistance > 10) { // 50% damage
+          fallDamage = Math.floor(this.maxHealth * 0.50);
+          console.log(`Moderate fall damage! Eff. Distance: ${effectiveFallDistance.toFixed(2)}, Damage: ${fallDamage}`);
+          window.game?.audio.play('player_hurt'); // Use a hurt sound
+        } else {
+          // Safe fall, play normal landing sound
+          console.log(`Safe landing. Eff. Distance: ${effectiveFallDistance.toFixed(2)}`);
+          window.game?.audio.play('player_step', { volume: 0.6 });
+        }
+
+        if (fallDamage > 0) {
+          this.takeDamage(fallDamage);
+        }
       }
       // Reset falling state and vertical velocity
       this.isFalling = false;
-      this.currentFallDistance = 0; 
+      this.currentFallDistance = 0;
+      this.jumpStartY = null; // Reset jump start Y after landing
       this.velocity.y = 0;
       this.isJumping = false;
       
@@ -410,13 +457,30 @@ export class Player {
   }
   
   takeDamage(amount) {
-    // Placeholder for damage system
-    console.log(`Player takes ${amount} damage`);
+    this.currentHealth = Math.max(0, this.currentHealth - amount);
+    console.log(`Player took ${amount} damage. Health: ${this.currentHealth}/${this.maxHealth}`);
+
+    // Set isDead flag if health reaches 0
+    if (this.currentHealth <= 0) {
+      this.isDead = true;
+      console.log("Player has died.");
+      // Optional: Play death sound? (Respawn sound might cover this)
+    }
+
+    // TODO: Add visual/audio feedback for taking damage (besides the fall sounds)
+    // window.game?.audio.play('player_hurt'); // Already played above based on severity
   }
   
   resetSessionStats() {
-      this.currentFallDistance = 0;
-      this.maxFallDistanceThisSession = 0;
+    // Reset tracking stats for a new session (e.g., after game over)
+    this.maxFallDistanceThisSession = 0;
+    this.currentFallDistance = 0;
+    this.isFalling = false;
+    this.isJumping = false;
+    this.hasHighJump = false; // Reset abilities if needed
+    this.canTelekinesis = false;
+    this.currentHealth = this.maxHealth; // Reset health
+    this.isDead = false; // Reset dead flag
   }
   
   enableHighJump() {
@@ -425,5 +489,44 @@ export class Player {
           this.hasHighJump = true;
           // Optional: Add a UI notification or visual effect
       }
+  }
+
+  // Method to check if player is dead
+  checkIfDead() {
+    return this.isDead;
+  }
+
+  // Method to reset state specifically for respawn (keeps abilities etc)
+  resetForRespawn() {
+      this.velocity.set(0, 0, 0);
+      this.isFalling = false;
+      this.currentFallDistance = 0;
+      this.isGrounded = true; // Assume respawn point is safe ground
+      this.isJumping = false;
+      this.currentHealth = this.maxHealth;
+      this.isDead = false;
+  }
+
+  // <<< ADD: Method to get current health state >>>
+  getHealthState() {
+    return {
+      current: this.currentHealth,
+      max: this.maxHealth
+    };
+  }
+
+  // <<< ADD: Method to heal the player >>>
+  heal(percentage) {
+    const healAmount = Math.floor(this.maxHealth * (percentage / 100));
+    const oldHealth = this.currentHealth;
+    this.currentHealth = Math.min(this.maxHealth, this.currentHealth + healAmount);
+    const actualHeal = this.currentHealth - oldHealth;
+
+    if (actualHeal > 0) {
+      console.log(`Player healed for ${actualHeal} (${percentage}% of max). Health: ${this.currentHealth}/${this.maxHealth}`);
+      window.game?.audio.play('health_pickup'); // Assuming sound 'health_pickup' exists
+    } else {
+      console.log(`Player health already full.`);
+    }
   }
 } 
