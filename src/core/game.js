@@ -31,6 +31,10 @@ export class Game {
     this.otherPlayers = {}; // Store other players' data/meshes { id: { mesh, state } }
     this.lastNetworkUpdate = 0; // Timer for throttling network updates
     this.networkUpdateInterval = 100; // Send updates every 100ms
+    
+    // <<< ADD Map Regeneration State >>>
+    this.mapRegenInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
+    this.timeSinceLastRegen = 0;
 
     // Game state
     this.state = {
@@ -192,6 +196,15 @@ export class Game {
     if (this.network && this.clientId && now - this.lastNetworkUpdate > this.networkUpdateInterval) {
       this.sendPlayerState();
       this.lastNetworkUpdate = now;
+    }
+    
+    // <<< ADD: Check for Map Regeneration >>>
+    if (!this.isUserPaused && !this.isPaused) { // Only update timer if game is active
+       this.timeSinceLastRegen += deltaTime * 1000; // deltaTime is in seconds
+       if (this.timeSinceLastRegen >= this.mapRegenInterval) {
+          this.regenerateLevel();
+          // Don't return here, let the rest of the frame process before potential async reload
+       }
     }
   }
   
@@ -530,5 +543,45 @@ export class Game {
         console.log(`Removed visual for player ${playerId}`);
      }
      delete this.otherPlayers[playerId];
+  }
+
+  // <<< ADD: Map Regeneration Logic >>>
+  async regenerateLevel() {
+    console.log(`Map regeneration triggered after ${this.timeSinceLastRegen / 1000} seconds.`);
+    this.ui?.showTemporaryMessage("Regenerating level...", 3000);
+    
+    // Reset timer immediately
+    this.timeSinceLastRegen = 0;
+    
+    // Clear visual representation of other players (as their positions are relative to the old map)
+    Object.keys(this.otherPlayers).forEach(id => this.removeOtherPlayer(id));
+    this.otherPlayers = {}; // Reset the cache
+    
+    // Stop current music maybe?
+    this.audio.stopMusic();
+    
+    // Reload level 0 (which handles clearing old scene objects)
+    await this.levelManager.loadLevel(0);
+    
+    // Get the new start position from the reloaded level
+    // Use the specific playerStart from level definition, not necessarily the first platform
+    this.initialPlayerPosition = this.levelManager.getEntryPosition('start') || new THREE.Vector3(0, 150, 0);
+    
+    // Reposition the player
+    if (this.player) {
+        this.player.setPosition(this.initialPlayerPosition);
+        // Ensure player mesh is in the new scene (loadLevel replaces the scene)
+        this.levelManager.scene.add(this.player.mesh);
+        // Also reset fall state in case they were falling during regen
+        this.player.isFalling = false;
+        this.player.currentFallDistance = 0;
+        this.player.jumpStartY = null;
+        this.player.velocity.set(0,0,0);
+    }
+    
+    // Restart music
+    this.audio.playMusic('surface', { volume: 0.4 });
+    
+    console.log("Map regeneration complete.");
   }
 } 
