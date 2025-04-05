@@ -1,0 +1,22 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Prevent scrollbars */
+    background-color: #7db6d5; /* Sky blue */
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    display: block; /* Remove potential space below canvas */
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    width: 100%;
+    text-align: center;
+    z-index: 100;
+    display: block;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 5px 0;
+}
