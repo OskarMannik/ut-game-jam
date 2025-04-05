@@ -14,6 +14,8 @@ export class UI {
     this.fadeOverlay = null;
     this.gameOverScreen = null;
     this.controlsDisplay = null;
+    this.memoryLogPanel = null;
+    this.dialogueBox = null;
   }
   
   init(gameState) {
@@ -33,6 +35,8 @@ export class UI {
     this.createFadeOverlay();
     this.createGameOverScreen();
     this.createControlsDisplay();
+    this.createMemoryLogPanel();
+    this.createDialogueBox();
     
     // Add CSS
     this.addStyles();
@@ -227,6 +231,51 @@ export class UI {
       </ul>
     `;
     this.container.appendChild(this.controlsDisplay);
+  }
+  
+  createMemoryLogPanel() {
+    this.memoryLogPanel = document.createElement('div');
+    this.memoryLogPanel.className = 'memory-log-panel';
+    this.memoryLogPanel.style.display = 'none';
+    this.memoryLogPanel.innerHTML = `
+      <div class="memory-log-content">
+        <h2>Memory Log</h2>
+        <div class="memory-list-container">
+          <ul id="memory-list"></ul>
+        </div>
+        <div class="memory-detail-container">
+          <h3 id="memory-detail-title">Select a Memory</h3>
+          <img id="memory-detail-image" src="" alt="Memory Visual" />
+          <p id="memory-detail-resonance">Resonance: -</p>
+          <p id="memory-detail-content"></p>
+        </div>
+        <button id="close-memory-log">Close</button>
+      </div>
+    `;
+    document.body.appendChild(this.memoryLogPanel);
+
+    // Add event listener for close button
+    document.getElementById('close-memory-log').addEventListener('click', () => {
+      this.hideMemoryLog();
+    });
+
+    // Add event listener for keyboard toggle (e.g., Tab key)
+    // We'll add the input handling later in InputManager/Game
+  }
+  
+  createDialogueBox() {
+    this.dialogueBox = document.createElement('div');
+    this.dialogueBox.className = 'dialogue-box';
+    this.dialogueBox.style.display = 'none';
+    this.dialogueBox.innerHTML = `
+      <div class="dialogue-speaker" id="dialogue-speaker"></div>
+      <div class="dialogue-text" id="dialogue-text"></div>
+      <div class="dialogue-prompt" id="dialogue-prompt">Press [E] to continue...</div>
+      <div class="dialogue-options" id="dialogue-options"></div>
+    `;
+    document.body.appendChild(this.dialogueBox);
+
+    // Close on next interact press (will be handled in Game update)
   }
   
   addStyles() {
@@ -447,6 +496,163 @@ export class UI {
       .controls-display li {
         margin-bottom: 3px;
       }
+
+      .memory-log-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 10, 20, 0.9);
+        color: #eee;
+        display: none; /* Hidden by default */
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        font-family: sans-serif;
+      }
+
+      .memory-log-content {
+        background-color: rgba(10, 30, 50, 0.95);
+        padding: 20px;
+        border: 1px solid #557799;
+        border-radius: 10px;
+        width: 80%;
+        max-width: 800px;
+        height: 70%;
+        max-height: 600px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .memory-log-content h2 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #aaddff;
+      }
+      
+      .memory-list-container {
+        float: left;
+        width: 30%;
+        height: calc(100% - 80px); /* Adjust based on header/footer height */
+        overflow-y: auto;
+        border-right: 1px solid #557799;
+        padding-right: 15px;
+        margin-right: 15px;
+      }
+
+      #memory-list {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      #memory-list li {
+        padding: 8px;
+        cursor: pointer;
+        border-bottom: 1px solid #335577;
+        transition: background-color 0.2s;
+      }
+
+      #memory-list li:hover {
+        background-color: rgba(70, 100, 130, 0.7);
+      }
+
+      .memory-detail-container {
+        float: left;
+        width: calc(70% - 30px); /* Adjust for padding/margins */
+        height: calc(100% - 80px); 
+        overflow-y: auto;
+      }
+
+      #memory-detail-image {
+        max-width: 150px;
+        max-height: 150px;
+        float: right;
+        margin-left: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #557799;
+      }
+
+      #memory-detail-resonance {
+        font-style: italic;
+        color: #88aacc;
+        margin-top: 5px;
+        margin-bottom: 15px;
+      }
+
+      #close-memory-log {
+        position: absolute;
+        bottom: 30px; /* Adjust positioning */
+        right: 40px; /* Adjust positioning */
+        padding: 10px 20px;
+        background-color: #4477aa;
+        border: none;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      .dialogue-box {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70%;
+        max-width: 700px;
+        background-color: rgba(10, 20, 40, 0.9);
+        border: 1px solid #6688cc;
+        border-radius: 8px;
+        color: #eee;
+        padding: 15px 20px;
+        display: none; /* Hidden by default */
+        flex-direction: column;
+        z-index: 900;
+        font-family: sans-serif;
+      }
+
+      .dialogue-speaker {
+        font-weight: bold;
+        color: #aaddff;
+        margin-bottom: 8px;
+        font-size: 16px;
+      }
+
+      .dialogue-text {
+        font-size: 14px;
+        margin-bottom: 10px;
+        line-height: 1.4;
+      }
+
+      .dialogue-prompt {
+        font-size: 12px;
+        color: #88aacc;
+        text-align: right;
+        font-style: italic;
+      }
+
+      .dialogue-options {
+        margin-top: 15px;
+        border-top: 1px solid #557799;
+        padding-top: 10px;
+        display: flex; /* Use flexbox for buttons */
+        gap: 10px; /* Spacing between buttons */
+      }
+
+      .dialogue-options button {
+        padding: 8px 15px;
+        background-color: #336699;
+        border: 1px solid #5588bb;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        flex-grow: 1; /* Make buttons share space */
+      }
+
+      .dialogue-options button:hover {
+        background-color: #4477aa;
+      }
     `;
     
     document.head.appendChild(style);
@@ -544,5 +750,81 @@ export class UI {
   
   hideGameOver() {
     this.gameOverScreen.style.display = 'none';
+  }
+
+  showMemoryLog() {
+    if (this.memoryLogPanel) {
+      this.updateMemoryLogList(); // Populate the list when shown
+      this.memoryLogPanel.style.display = 'flex';
+    }
+  }
+
+  hideMemoryLog() {
+    if (this.memoryLogPanel) {
+      this.memoryLogPanel.style.display = 'none';
+    }
+  }
+
+  updateMemoryLogList() {
+    // TODO: Get collected memories from Game state and populate the #memory-list ul
+    const listElement = document.getElementById('memory-list');
+    if (!listElement) return;
+    listElement.innerHTML = ''; // Clear previous list
+
+    // Example: (Replace with actual data later)
+    const fakeMemories = [
+      { id: 'surface_memory_1', data: { content: "Test Memory 1", resonance: 'Hope', imagePath: '' } },
+      { id: 'surface_memory_2', data: { content: "Test Memory 2", resonance: 'Sorrow', imagePath: '' } }
+    ];
+
+    fakeMemories.forEach(mem => {
+      const listItem = document.createElement('li');
+      listItem.textContent = mem.id; // Display ID for now
+      listItem.dataset.memoryId = mem.id;
+      listItem.addEventListener('click', () => {
+        this.showMemoryDetail(mem); // Show details when clicked
+      });
+      listElement.appendChild(listItem);
+    });
+  }
+
+  showMemoryDetail(memoryData) {
+    // TODO: Update the detail view elements
+    document.getElementById('memory-detail-title').textContent = memoryData.id; // Use ID as title for now
+    document.getElementById('memory-detail-image').src = memoryData.data.imagePath || '/images/memories/default.png';
+    document.getElementById('memory-detail-resonance').textContent = `Resonance: ${memoryData.data.resonance || 'Unknown'}`;
+    document.getElementById('memory-detail-content').textContent = memoryData.data.content || 'No description available.';
+  }
+
+  showDialogue(speaker, text, options = []) {
+    if (this.dialogueBox) {
+      document.getElementById('dialogue-speaker').textContent = speaker || '';
+      document.getElementById('dialogue-text').textContent = text || '...';
+      
+      const optionsContainer = document.getElementById('dialogue-options');
+      const promptElement = document.getElementById('dialogue-prompt');
+      optionsContainer.innerHTML = ''; // Clear old options
+
+      if (options.length > 0) {
+        promptElement.style.display = 'none'; // Hide "Press E" prompt
+        options.forEach(option => {
+          const button = document.createElement('button');
+          button.textContent = option.text;
+          button.onclick = option.callback; // Assign callback function
+          optionsContainer.appendChild(button);
+        });
+      } else {
+        promptElement.style.display = 'block'; // Show "Press E" prompt
+      }
+
+      this.dialogueBox.style.display = 'flex';
+    }
+  }
+
+  hideDialogue() {
+    if (this.dialogueBox) {
+      this.dialogueBox.style.display = 'none';
+      // Unpause game?
+    }
   }
 } 

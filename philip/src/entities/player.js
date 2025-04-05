@@ -22,6 +22,7 @@ export class Player {
     this.isJumping = false;
     this.isFalling = false;
     this.isSwimming = false;
+    this.currentDialogue = null; // To hold dialogue data from interaction
     
     // Create player mesh
     this.mesh = this.createPlayerMesh();
@@ -102,9 +103,17 @@ export class Player {
     this.collectedItemsThisFrame = [];
     this.requestedTransition = null;
     
-    // Check if player is underwater
+    const wasUnderwater = this.isUnderwater; // Store previous state
     this.isUnderwater = levelManager.isPositionUnderwater ? 
       levelManager.isPositionUnderwater(this.mesh.position) : false;
+    
+    // Check for water entry/exit
+    if (this.isUnderwater && !wasUnderwater) {
+        window.game?.audio.play('player_splash', { volume: 0.8 }); // Entered water
+        // Optionally stop step sounds if implemented
+    } else if (!this.isUnderwater && wasUnderwater) {
+        window.game?.audio.play('player_splash', { volume: 0.6 }); // Exited water
+    }
     
     // Handle player movement based on environment
     if (this.isUnderwater) {
@@ -131,8 +140,8 @@ export class Player {
       this.checkCollectibles(levelManager);
     }
     
-    // Check for interactive objects
-    if (inputState.interact && levelManager.getClosestInteractiveObject) {
+    // Check for interaction input
+    if (inputState.interact) {
       this.interact(levelManager);
     }
     
@@ -177,12 +186,18 @@ export class Player {
       this.velocity.y = this.jumpForce;
       this.isJumping = true;
       this.isGrounded = false;
+      window.game?.audio.play('player_jump'); // Play jump sound via global game instance
     }
     
     // Apply gravity
     if (!this.isGrounded) {
+      this.isFalling = true; // Track falling state
       this.velocity.y -= this.gravity * deltaTime;
     } else {
+      if (this.isFalling) { // Was falling, now grounded
+        window.game?.audio.play('player_step', { volume: 0.6 }); // Play step sound on landing
+      }
+      this.isFalling = false;
       this.velocity.y = 0;
       this.isJumping = false;
     }
@@ -314,7 +329,25 @@ export class Player {
   }
   
   interact(levelManager) {
-    // Check for interactive objects near player
+    // Reset requested transition first
+    this.requestedTransition = null; 
+    this.currentDialogue = null; // Also reset dialogue request
+
+    // Check for NPCs first
+    const npc = levelManager.getClosestNPC ? levelManager.getClosestNPC(this.mesh.position, 3) : null;
+    console.log(`[Player.interact] Found NPC:`, npc ? npc.name : 'None'); // Log NPC found
+    if (npc) {
+      const dialogueData = npc.interact(); 
+      console.log(`[Player.interact] Dialogue data from NPC:`, dialogueData);
+      if (dialogueData) {
+        // Store dialogue data AND the NPC reference
+        this.currentDialogue = { ...dialogueData, npc }; // Include NPC reference
+        console.log(`[Player.interact] Stored dialogue:`, this.currentDialogue);
+      }
+      return; // Prioritize NPC interaction
+    }
+
+    // If no NPC found, check for interactive objects
     const interactiveObject = levelManager.getClosestInteractiveObject(
       this.mesh.position,
       3 // Interaction radius
@@ -330,6 +363,12 @@ export class Player {
   
   getRequestedTransition() {
     return this.requestedTransition;
+  }
+  
+  getCurrentDialogue() {
+    const dialogue = this.currentDialogue;
+    this.currentDialogue = null; // Clear after retrieving
+    return dialogue;
   }
   
   useTelekinesis(levelManager) {

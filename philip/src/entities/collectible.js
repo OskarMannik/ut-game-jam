@@ -167,9 +167,47 @@ export function createCollectible(position, type, id, effectType = null) {
       data.effect = { type: effectType };
     }
   } else if (type === 'memory') {
-    // Sample memory data
-    data.content = `Memory ${id}: A glimpse of the past...`;
-    data.image = `/images/memory_${id}.jpg`;
+    // Assign resonance and image based on ID (example structure)
+    switch (id) {
+      // Surface Memories
+      case 'surface_memory_1':
+        data.content = "A faded photograph... sunshine, laughter. A feeling of warmth.";
+        data.resonance = 'Hope';
+        data.imagePath = '/images/memories/surface_hope.png'; // Placeholder path
+        break;
+      case 'surface_memory_2':
+        data.content = "Footprints in the sand, leading away. A sense of departure.";
+        data.resonance = 'Sorrow';
+        data.imagePath = '/images/memories/surface_sorrow.png'; // Placeholder path
+        break;
+      // Underwater Memories
+      case 'underwater_memory_1':
+        data.content = "A swirling current pulling downwards. The pressure increases...";
+        data.resonance = 'Fear';
+        data.imagePath = '/images/memories/underwater_fear.png'; // Placeholder path
+        break;
+      case 'underwater_memory_2':
+        data.content = "Strange glowing plants swaying rhythmically. A hidden beauty.";
+        data.resonance = 'Curiosity';
+        data.imagePath = '/images/memories/underwater_curiosity.png'; // Placeholder path
+        break;
+      // Cave Memories
+      case 'cave_memory_1':
+        data.content = "Echoes in the dark. Something ancient slumbers here.";
+        data.resonance = 'Awe';
+        data.imagePath = '/images/memories/cave_awe.png'; // Placeholder path
+        break;
+      case 'cave_memory_2':
+        data.content = "A cracked stone tablet with unreadable symbols. A lost history.";
+        data.resonance = 'Mystery';
+        data.imagePath = '/images/memories/cave_mystery.png'; // Placeholder path
+        break;
+      // Add cases for other memories (ruins, subconscious, void) here later...
+      default:
+        data.content = `Memory Fragment ${id}: An indistinct flash of the past.`;
+        data.resonance = 'Neutral';
+        data.imagePath = '/images/memories/default.png'; // Placeholder path
+    }
   }
   
   return new Collectible(position, type, id, data);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createCollectible } from '../entities/collectible.js';
 import { InteractiveObject } from '../entities/interactive.js';
+import { NPC } from '../entities/npc.js';
 import { Biome } from './biome.js';
 
 export class LevelManager {
@@ -10,6 +11,7 @@ export class LevelManager {
     this.levels = [];
     this.collectibles = [];
     this.interactiveObjects = [];
+    this.npcs = [];
     this.waterLevel = 0; // Y-position of water surface (for underwater detection)
     this.movableObjects = [];
     this.collisionObjects = [];
@@ -140,6 +142,9 @@ export class LevelManager {
     // Add interactive objects
     this.addLevelInteractiveObjects(levelIndex);
     
+    // Add NPCs
+    this.addLevelNPCs(levelIndex);
+    
     // Add transition points between levels
     this.addLevelTransitionPoints(levelIndex);
     
@@ -154,6 +159,8 @@ export class LevelManager {
     this.movableObjects = [];
     this.collisionObjects = [];
     this.transitionPoints = [];
+    this.groundObjects = [];
+    this.npcs = [];
     
     // Scene will be replaced entirely
   }
@@ -333,6 +340,35 @@ export class LevelManager {
     return interactiveObject;
   }
   
+  addLevelNPCs(levelIndex) {
+    switch (levelIndex) {
+      case 2: // Underwater Caves
+        this.addNPC(
+          new THREE.Vector3(-15, 0, 10), // Position in the cave
+          "Echoing Shade", 
+          [
+            "...who disturbs the silence...?",
+            "These depths hold forgotten whispers...",
+            "I sense... warmth. A flicker. Do you carry a memory of *Hope*?"
+          ],
+          { 
+            color: 0x6688cc,
+            desire: { type: 'resonance', value: 'Hope' },
+            offer: { type: 'memory', id: 'cave_memory_2' } // Offers the mystery tablet memory
+          }
+        );
+        break;
+      // Add cases for other levels later...
+    }
+  }
+  
+  addNPC(position, name, dialogue, appearance) {
+    const npc = new NPC(position, name, dialogue, appearance);
+    this.npcs.push(npc);
+    this.scene.add(npc.mesh);
+    return npc;
+  }
+  
   addLevelTransitionPoints(levelIndex) {
     // These are invisible triggers that transition between levels when the player enters them
     // They serve as an alternative to the interactive objects which require explicit interaction
@@ -352,6 +388,11 @@ export class LevelManager {
     // Update all interactive objects
     this.interactiveObjects.forEach(obj => {
       obj.update(deltaTime, player.mesh.position);
+    });
+    
+    // Update NPCs
+    this.npcs.forEach(npc => {
+        npc.update(deltaTime);
     });
     
     // Update physics for movable objects
@@ -456,6 +497,23 @@ export class LevelManager {
     });
     
     return closest;
+  }
+  
+  getClosestNPC(position, maxDistance) {
+    let closestNPC = null;
+    let closestDistanceSq = maxDistance * maxDistance;
+
+    this.npcs.forEach(npc => {
+      if (npc.mesh) {
+        const distanceSq = position.distanceToSquared(npc.mesh.position);
+        if (distanceSq < closestDistanceSq) {
+          closestNPC = npc;
+          closestDistanceSq = distanceSq;
+        }
+      }
+    });
+
+    return closestNPC;
   }
   
   checkTransitionPoint(playerPosition) {
