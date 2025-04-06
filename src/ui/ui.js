@@ -349,133 +349,33 @@ export class UI {
     const controlsContainer = document.createElement('div');
     controlsContainer.className = 'touch-controls-container';
 
-    // <<< ADD Touchpad Area (Left Side) >>>
-    const touchpadArea = document.createElement('div');
-    touchpadArea.id = 'touchpad-area';
-    const touchpadHandle = document.createElement('div');
-    touchpadHandle.id = 'touchpad-handle';
-    touchpadArea.appendChild(touchpadHandle);
-    this.touchControls.touchpad = { area: touchpadArea, handle: touchpadHandle }; // Store refs
+    // Movement Buttons (Left Side)
+    const moveContainer = document.createElement('div');
+    moveContainer.className = 'touch-move-container';
+    this.touchControls.forward = this.createTouchButton('▲', 'forward', moveContainer);
+    const leftRightContainer = document.createElement('div');
+    leftRightContainer.className = 'touch-left-right';
+    this.touchControls.left = this.createTouchButton('◄', 'left', leftRightContainer);
+    this.touchControls.right = this.createTouchButton('►', 'right', leftRightContainer);
+    moveContainer.appendChild(leftRightContainer);
+    this.touchControls.backward = this.createTouchButton('▼', 'backward', moveContainer);
 
-    // Action Buttons (Right Side) - Keep as is for now (Jump, Pause)
+    // Action Buttons (Right Side)
     const actionContainer = document.createElement('div');
     actionContainer.className = 'touch-action-container';
-    this.touchControls.jump = this.createTouchButton('JUMP', 'jump', actionContainer);
+    this.touchControls.jump = this.createTouchButton('JUMP', 'jump', actionContainer); // Or an icon
+    // this.touchControls.interact = this.createTouchButton('E', 'interact', actionContainer);
+    // this.touchControls.action = this.createTouchButton('F', 'action', actionContainer);
+    // Maybe a pause button? Keep Pause for now
     this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer);
 
 
-    // <<< MODIFY: Append touchpad instead of moveContainer >>>
-    controlsContainer.appendChild(touchpadArea); 
+    controlsContainer.appendChild(moveContainer);
     controlsContainer.appendChild(actionContainer);
-    document.body.appendChild(controlsContainer); 
+    document.body.appendChild(controlsContainer); // Append to body to overlay game canvas
     
+    // <<< ADD Class to body if touch controls are created >>>
     document.body.classList.add('touch-device-active'); 
-
-    // <<< ADD Touchpad Logic >>>
-    this.setupTouchpadListeners(touchpadArea, touchpadHandle);
-  }
-
-  // <<< ADD Touchpad Listener Setup Function >>>
-  setupTouchpadListeners(area, handle) {
-    let touchId = null;
-    let areaRect = null;
-    let centerX = 0;
-    let centerY = 0;
-    let radius = 0;
-    let handleRadius = 0;
-
-    const updateDimensions = () => {
-        areaRect = area.getBoundingClientRect();
-        centerX = areaRect.left + areaRect.width / 2;
-        centerY = areaRect.top + areaRect.height / 2;
-        radius = areaRect.width / 2; 
-        handleRadius = handle.offsetWidth / 2;
-    };
-
-    // Initial calculation and update on resize/scroll
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    window.addEventListener('scroll', updateDimensions); // In case layout shifts
-
-    area.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Prevent default touch actions like scrolling
-        if (touchId === null) { // Only track the first touch
-            touchId = e.changedTouches[0].identifier;
-            updateDimensions(); // Recalculate dimensions on touch start
-            const touch = e.changedTouches[0];
-            processTouch(touch.clientX, touch.clientY);
-        }
-    }, { passive: false });
-
-    area.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (touchId !== null) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                if (e.changedTouches[i].identifier === touchId) {
-                    const touch = e.changedTouches[i];
-                    processTouch(touch.clientX, touch.clientY);
-                    break;
-                }
-            }
-        }
-    }, { passive: false });
-
-    const touchEndHandler = (e) => {
-        if (touchId !== null) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                if (e.changedTouches[i].identifier === touchId) {
-                    touchId = null;
-                    resetHandle();
-                    break;
-                }
-            }
-        }
-    };
-
-    area.addEventListener('touchend', touchEndHandler);
-    area.addEventListener('touchcancel', touchEndHandler);
-
-    const processTouch = (touchX, touchY) => {
-        const deltaX = touchX - centerX;
-        const deltaY = touchY - centerY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        
-        // Normalize the direction vector
-        let normalizedX = deltaX / distance;
-        let normalizedY = deltaY / distance;
-
-        if (isNaN(normalizedX)) normalizedX = 0;
-        if (isNaN(normalizedY)) normalizedY = 0;
-
-        // Clamp the distance to the touchpad radius
-        const clampedDistance = Math.min(distance, radius - handleRadius);
-        
-        const handleX = normalizedX * clampedDistance;
-        const handleY = normalizedY * clampedDistance;
-        
-        // Update handle visual position (relative to center)
-        handle.style.transform = `translate(-50%, -50%) translate(${handleX}px, ${handleY}px)`
-        
-        // Calculate normalized input (-1 to 1 for InputManager)
-        // Invert Y because screen Y is down, but game Y is up
-        const inputX = handleX / (radius - handleRadius);
-        const inputY = -handleY / (radius - handleRadius);
-
-        // Send to InputManager
-        if (this.inputManager && typeof this.inputManager.updateJoystick === 'function') {
-            this.inputManager.updateJoystick(inputX, inputY);
-        } else {
-            // console.warn("InputManager or updateJoystick not found for touchpad");
-        }
-    };
-    
-    const resetHandle = () => {
-        handle.style.transform = `translate(-50%, -50%) translate(0px, 0px)`
-        // Reset InputManager state
-        if (this.inputManager && typeof this.inputManager.updateJoystick === 'function') {
-            this.inputManager.updateJoystick(0, 0);
-        }
-    };
   }
 
   // Helper to create a single touch button
@@ -1190,33 +1090,6 @@ export class UI {
       /* <<< HIDE Controls Display on Touch Devices >>> */
       body.touch-device-active .controls-display {
         display: none;
-      }
-
-      /* <<< ADD: Touchpad Styles >>> */
-      #touchpad-area {
-        width: 120px; /* Size of the outer circle */
-        height: 120px;
-        background-color: rgba(80, 80, 80, 0.4);
-        border-radius: 50%;
-        position: relative; /* For positioning the handle */
-        pointer-events: auto; /* Enable touch events on the area */
-        user-select: none;
-        -webkit-user-select: none;
-        touch-action: none; /* Prevent scrolling when dragging joystick */
-      }
-
-      #touchpad-handle {
-        width: 50px; /* Size of the inner circle */
-        height: 50px;
-        background-color: rgba(180, 180, 180, 0.7);
-        border: 2px solid rgba(255, 255, 255, 0.8);
-        border-radius: 50%;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%); /* Center the handle */
-        pointer-events: none; /* Handle shouldn't capture events */
-        transition: transform 0.05s linear; /* Optional: Smooth handle movement */
       }
     `;
     
