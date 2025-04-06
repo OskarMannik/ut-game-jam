@@ -32,8 +32,7 @@ export class InputManager {
       ' ': 'jump',
       'z': 'down',
       'e': 'interact',
-      'f': 'action',
-      'p': 'pause'
+      'f': 'action'
     };
     
     // Bind event handlers

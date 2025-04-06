@@ -64,7 +64,6 @@ export class UI {
     this.createControlsDisplay();
     this.createMemoryLogPanel();
     this.createDialogueBox();
-    this.createPauseScreen();
     this.createGameWonScreen();
     this.createCrosshair();
     this.createTouchControls();
@@ -241,8 +240,7 @@ export class UI {
         <li><strong>S/↓:</strong> Backward</li>
         <li><strong>A/←:</strong> Left</li> 
         <li><strong>D/→:</strong> Right</li>
-        <li><strong>Space:</strong> Jump</li> 
-        <li><strong>P:</strong> Pause</li>
+        <li><strong>Space:</strong> Jump</li>  
       </ul>
     `;
     this.container.appendChild(this.controlsDisplay);
@@ -291,19 +289,6 @@ export class UI {
     document.body.appendChild(this.dialogueBox);
 
     // Close on next interact press (will be handled in Game update)
-  }
-  
-  createPauseScreen() {
-    this.pauseScreen = document.createElement('div');
-    this.pauseScreen.className = 'pause-screen';
-    this.pauseScreen.style.display = 'none';
-    this.pauseScreen.innerHTML = `
-      <div class="pause-content">
-        <h1>PAUSED</h1>
-        <p>Press 'P' to resume</p>
-      </div>
-    `;
-    document.body.appendChild(this.pauseScreen);
   }
   
   createGameWonScreen() {
@@ -367,7 +352,7 @@ export class UI {
     // this.touchControls.interact = this.createTouchButton('E', 'interact', actionContainer);
     // this.touchControls.action = this.createTouchButton('F', 'action', actionContainer);
     // Maybe a pause button? Keep Pause for now
-    this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer);
+    // this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer); // <<< REMOVE Pause Button >>>
 
 
     controlsContainer.appendChild(moveContainer);
@@ -765,37 +750,6 @@ export class UI {
         background-color: #4477aa;
       }
       
-      .pause-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1100;
-        font-family: Arial, sans-serif;
-      }
-      
-      .pause-content {
-        text-align: center;
-      }
-      
-      .pause-content h1 {
-        font-size: 48px;
-        margin-bottom: 10px;
-        letter-spacing: 3px;
-        text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-      }
-      
-      .pause-content p {
-        font-size: 20px;
-        opacity: 0.8;
-      }
-
       .game-won-screen {
         position: fixed;
         top: 0;
@@ -1091,6 +1045,20 @@ export class UI {
       body.touch-device-active .controls-display {
         display: none;
       }
+
+      /* <<< ADJUST UI for Touch Devices >>> */
+      body.touch-device-active .chat-container {
+          max-height: 100px; /* Significantly reduce height */
+          width: 60%;      /* Make it narrower */
+          font-size: 0.8em; /* Slightly smaller text */
+          bottom: 70px;    /* Move it up slightly to avoid controls */
+          left: 10px;
+      }
+      body.touch-device-active #health-bar-container {
+          top: 50px;  /* Move health bar down below depth/time */
+          right: 10px; /* Keep it top-right-ish */
+          width: 100px; /* Maybe make it slightly smaller */
+      }
     `;
     
     document.head.appendChild(style);
@@ -1302,18 +1270,6 @@ export class UI {
   hideDialogue() {
     if (this.dialogueBox) {
       this.dialogueBox.style.display = 'none';
-    }
-  }
-
-  showPauseScreen() {
-    if (this.pauseScreen) {
-      this.pauseScreen.style.display = 'flex';
-    }
-  }
-  
-  hidePauseScreen() {
-    if (this.pauseScreen) {
-      this.pauseScreen.style.display = 'none';
     }
   }
 
