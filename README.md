@@ -1,4 +1,4 @@
-# Deep Dive
+# DeepJump
 
 **Description:**
 This is a 3D multiplayer video game created by Oskar Männik and Philip Paškov for the University of Tartu Game Jam 2025.
