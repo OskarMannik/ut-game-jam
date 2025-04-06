@@ -801,14 +801,25 @@ export class Biome {
   createDescentEnvironment(scene) {
     console.log("[Biome] Creating Descent Environment...");
     
-    // <<< REVERT to Solid Background Color >>>
-    scene.background = new THREE.Color(0x7db6d5); // Sky blue
-    // <<< COMMENT OUT Skybox Call >>>
-    // this.createSkybox(scene);
-    
+    // <<< RE-ADD CubeTextureLoader >>>
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader
+        .setPath('/textures/skybox/') // Path relative to the public folder
+        .load([
+            'px.png', // Positive X
+            'nx.png', // Negative X
+            'py.png', // Positive Y (Top)
+            'ny.png', // Negative Y (Bottom)
+            'pz.png', // Positive Z (Front)
+            'nz.png'  // Negative Z (Back)
+        ]);
+    scene.background = texture;
+   
+    // Keep fog, it often helps blend the skybox with the scene
     scene.fog = new THREE.Fog(0x7db6d5, 50, 150); 
-    console.log("[Biome] Background and Fog set."); // Adjust log message
+    console.log("[Biome] Skybox background and Fog set."); // Restored original log message
 
+    // <<< Lighting remains the same >>>
     // Remove previous lights
     scene.remove(scene.getObjectByName('topLight')); // Remove if previously added by name
     scene.remove(scene.getObjectByName('ambientLight'));
@@ -836,10 +847,10 @@ export class Biome {
 
     // Generate floating platforms
     const platformCount = 30;
-    const startY = 145; // <<< INCREASED FURTHER: Start Y level for first platform >>>
+    const startY = 145; // <<< Restored original Y >>>
     const endY = 10;   
     const horizontalRange = 25;
-    const playerStartY = 150; // <<< INCREASED FURTHER: Player actual start height >>>
+    const playerStartY = 150; // <<< Restored original Y >>>
 
     let currentY = startY;
     let lastPlatformPos = new THREE.Vector3(0, playerStartY, 0); 
@@ -961,7 +972,7 @@ export class Biome {
     console.log(`[Biome] Generated ${platformCount} platforms.`);
 
     // Final ground plane at the bottom
-    const finalGround = this.createGround(scene, new THREE.Color(0x334455), 500, false);
+    const finalGround = this.createGround(scene, new THREE.Color(0x334455), 100, false);
     finalGround.position.y = 0; // Set ground at Y=0
     this.collisionObjects.push(finalGround); // Also add to collision
     console.log("[Biome] Final ground plane created.");
@@ -984,16 +995,4 @@ export class Biome {
     
     return platform;
   }
-
-  // <<< Keep Skybox Creation function commented out >>>
-  /*
-  createSkybox(scene) {
-      const loader = new THREE.CubeTextureLoader();
-      const texture = loader.setPath('/textures/skybox/').load([
-          'px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'
-      ]);
-      scene.background = texture;
-      console.log("[Biome] Skybox created.");
-  }
-  */
 } 
