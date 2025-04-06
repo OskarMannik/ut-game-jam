@@ -5,6 +5,7 @@ export class UI {
   constructor() {
     // Reference to game state
     this.gameState = null;
+    this.inputManager = null;
     
     // UI elements
     this.container = null;
@@ -31,8 +32,9 @@ export class UI {
     this.messageTimeout = null;
   }
   
-  init(gameState) {
+  init(gameState, inputManager) {
     this.gameState = gameState;
+    this.inputManager = inputManager;
     
     // Create main UI container
     this.container = document.createElement('div');
@@ -1420,8 +1422,20 @@ export class UI {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         sendMessage();
+        // Optional: Force blur after sending on Enter key, useful for mobile
+        // chatInput.blur(); 
       }
     });
+
+    // <<< ADD Focus/Blur Listeners >>>
+    if (this.inputManager) { // Check if InputManager was passed
+      chatInput.addEventListener('focus', () => {
+        this.inputManager.setChatFocus(true);
+      });
+      chatInput.addEventListener('blur', () => {
+        this.inputManager.setChatFocus(false);
+      });
+    }
 
     inputContainer.appendChild(chatInput);
     inputContainer.appendChild(sendButton);

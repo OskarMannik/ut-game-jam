@@ -60,7 +60,7 @@ export class Game {
     // Initialize systems
     await this.audio.init();
     this.renderer.init();
-    this.ui.init(this.state);
+    this.ui.init(this.state, this.input);
     
     // <<< Pass chat input element to InputManager >>>
     const chatInputElement = this.ui.chatUI.input; // Get the element from UI
