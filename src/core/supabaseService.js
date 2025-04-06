@@ -1,9 +1,8 @@
 // ut-game-jam/src/core/supabaseService.js
 
-// <<< IMPORTANT: Replace with YOUR Supabase URL and Anon Key >>>
-// Consider using environment variables for production builds if possible
-const SUPABASE_URL = 'https://zvjwxbpnqdgutiwhdtlo.supabase.co'; 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2and4YnBucWRndXRpd2hkdGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM4ODExNzYsImV4cCI6MjA1OTQ1NzE3Nn0.LP5Gb0XN_u4uiys9cv4gMzaWtX-g9YxL50BeEhFEjLY';
+// <<< IMPORTANT: Use environment variables >>>
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL; 
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Check if Supabase global exists (from CDN)
 if (typeof supabase === 'undefined') {
@@ -12,19 +11,12 @@ if (typeof supabase === 'undefined') {
 
 let supabaseClient = null;
 try {
-    // REMOVE the redundant if/else check
-    /* REMOVE:
-    if (SUPABASE_URL !== 'https://zvjwxbpnqdgutiwhdtlo.supabase.co' && SUPABASE_ANON_KEY !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2and4YnBucWRndXRpd2hkdGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM4ODExNzYsImV4cCI6MjA1OTQ1NzE3Nn0.LP5Gb0XN_u4uiys9cv4gMzaWtX-g9YxL50BeEhFEjLY') {
+    // <<< Check if the environment variables are loaded >>>
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error("Supabase URL or Anon Key missing from environment variables. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+    } else if (typeof supabase !== 'undefined' && supabase.createClient) {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("Supabase client initialized.");
-    } else {
-        console.warn("Supabase URL or Anon Key not provided. High scores will not be saved.");
-    }
-    */
-    // <<< Directly initialize the client >>>
-    if (typeof supabase !== 'undefined' && supabase.createClient) {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("Supabase client initialized.");
+        console.log("Supabase client initialized from environment variables.");
     } else {
         console.error("Supabase object or createClient function not found. Check CDN script.")
     }
