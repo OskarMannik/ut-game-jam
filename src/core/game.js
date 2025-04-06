@@ -49,7 +49,8 @@ export class Game {
       playerHealth: null,
       gameOverReason: null,
       gameWon: false,
-      finalScore: 0
+      finalScore: 0,
+      scoreFromLastAttempt: null // <<< ADDED: Store score from the attempt before respawn
     };
 
     // Bind methods
@@ -182,14 +183,6 @@ export class Game {
     // Normal game updates only if NOT starting dialogue
     this.player.update(deltaTime, inputState, this.levelManager);
 
-    // <<< MODIFY: Check for player death and respawn >>>
-    if (this.player.checkIfDead()) {
-      this.respawnPlayer('death_by_fall'); // Use new reason
-      // Skip the rest of the update for this frame after respawn
-      requestAnimationFrame(this.update);
-      return;
-    }
-
     this.levelManager.update(deltaTime, this.player);
     
     // Process collected items
@@ -260,9 +253,17 @@ export class Game {
         this.state.gameTimer += deltaTime; // Count up
     }
 
+    // <<< ADD: Check for zero health >>>
+    if (this.player && this.player.currentHealth <= 0) {
+        if (!this.isRunning) return; // Prevent multiple calls if already ending
+        console.log("Player health reached zero, triggering respawn.");
+        this.respawnPlayer('health');
+        return; // Stop further checks in this frame after triggering respawn
+    }
+
     // Check for falling out of world
     if (this.player.mesh.position.y < -20) { 
-      this.gameOver('fall');
+      this.respawnPlayer('fall'); 
     }
 
     // Basic win condition - reaching the bottom
@@ -321,6 +322,9 @@ export class Game {
   }
   
   gameOver(reason = 'unknown') { 
+    // <<< ADD: Log entry >>>
+    console.log(`Entering gameOver function. Reason: ${reason}`);
+
     if (!this.isRunning) return; 
     this.isRunning = false;
     this.state.gameOverReason = reason;
@@ -328,8 +332,8 @@ export class Game {
     // <<< IMPLEMENT NEW Score Calculation >>>
     const BaseTimeScore = 10000;
     const PenaltyPerSecond = 10;
-    const PointsPerArtifact = 150;
-    const PointsPerMemory = 75;
+    const PointsPerArtifact = 1000;
+    const PointsPerMemory = 750;
 
     const elapsedSeconds = this.state.gameTimer;
     const numArtifacts = this.state.artifacts;
@@ -341,6 +345,9 @@ export class Game {
 
     this.state.finalScore = Math.floor(CalculatedScore); 
     
+    // <<< ADD: Log before save call >>>
+    console.log(`Calling saveHighScore from gameOver. Final score: ${this.state.finalScore}`);
+
     // Save High Score (async but we don't need to wait here)
     this.supabase.saveHighScore(
       this.playerName, 
@@ -377,7 +384,8 @@ export class Game {
       playerHealth: null,
       gameOverReason: null,
       gameWon: false,
-      finalScore: 0 
+      finalScore: 0,
+      scoreFromLastAttempt: null // <<< ENSURE RESET
     };
 
     // <<< Reset Player Stats >>>
@@ -446,16 +454,13 @@ export class Game {
     }
   }
 
-  gameWon() {
-    if (!this.isRunning) return; 
-    this.isRunning = false;
-    this.state.gameWon = true;
-    
-    // <<< IMPLEMENT NEW Score Calculation >>>
+  // <<< ADD: Reusable Score Calculation Method >>>
+  calculateScore(isWin = false) { // <<< ADD isWin parameter
     const BaseTimeScore = 10000;
     const PenaltyPerSecond = 10;
-    const PointsPerArtifact = 150;
-    const PointsPerMemory = 75;
+    const PointsPerArtifact = 1000; // <<< INCREASED from 500
+    const PointsPerMemory = 750;   // <<< INCREASED from 250
+    const WinBonus = 1000; // <<< ADD Win Bonus constant
 
     const elapsedSeconds = this.state.gameTimer;
     const numArtifacts = this.state.artifacts;
@@ -463,10 +468,33 @@ export class Game {
 
     const TimeScore = Math.max(0, BaseTimeScore - (elapsedSeconds * PenaltyPerSecond));
     const CollectibleScore = (numArtifacts * PointsPerArtifact) + (numMemories * PointsPerMemory);
-    const CalculatedScore = TimeScore + CollectibleScore;
+    let CalculatedScore = TimeScore + CollectibleScore;
+
+    if (isWin) {
+        CalculatedScore += WinBonus;
+    }
+
+    return Math.floor(CalculatedScore);
+  }
+
+  gameWon() {
+    // <<< ADD: Log entry >>>
+    console.log("Entering gameWon function.");
+
+    if (!this.isRunning) return; 
+    // <<< REMOVE: Don't stop the game >>>
+    // this.isRunning = false; 
+    this.state.gameWon = true; // Keep track that a win occurred if needed
+    
+    // <<< USE Reusable Score Calculation >>>
+    this.state.finalScore = this.calculateScore(true); // Pass true for win bonus
       
-    this.state.finalScore = Math.floor(CalculatedScore);
+    // <<< CLEAR last attempt score on win (still good practice) >>>
+    this.state.scoreFromLastAttempt = null; 
       
+    // <<< ADD: Log before save call >>>
+    console.log(`Calling saveHighScore from gameWon. Final score: ${this.state.finalScore}`);
+
     // Save High Score (async but we don't need to wait here)
     this.supabase.saveHighScore(
       this.playerName, 
@@ -475,37 +503,94 @@ export class Game {
       this.state.artifacts  // Pass artifacts collected
     ).catch(e => console.error("Failed to save high score on game won:", e)); 
     
-    // <<< Fetch and display high scores >>>
+    // <<< REMOVE: Fetching scores and showing win UI >>>
+    /*
     this.supabase.getHighScores().then(scores => {
         this.ui.showGameWon(this.state, scores); // Pass scores to UI
     }).catch(e => {
         console.error("Failed to get high scores for game won screen:", e);
         this.ui.showGameWon(this.state, []); // Show screen even if fetch fails
     });
+    */
     
-    // Don't show UI immediately, wait for fetch (or show loading state)
-    // this.ui.showGameWon(this.state); 
-    this.audio.stopMusic();
-    this.audio.play('game_win_sound');
-    this.input.clearInputState();
+    // <<< REMOVE: Audio changes for win screen >>>
+    // this.audio.stopMusic();
+    // this.audio.play('game_win_sound');
+    // this.input.clearInputState();
+
+    // <<< ADD: Immediately respawn, passing the score >>>
+    console.log("Game won, triggering respawn...");
+    this.respawnPlayer('win', this.state.finalScore); 
   }
 
   // <<< MODIFY: Player Respawn Logic >>>
-  respawnPlayer(reason = 'unknown') {
+  respawnPlayer(reason = 'unknown', scoreToDisplay = null) { // <<< ADD scoreToDisplay parameter
     if (!this.player || !this.initialPlayerPosition) {
       console.error("Cannot respawn: Player or initial position missing. Triggering full game over.");
       this.gameOver('respawn_error');
       return;
     }
 
+    // <<< MODIFY: Calculate score only if not provided >>>
+    let finalScoreForDisplay;
+    if (scoreToDisplay !== null) {
+        finalScoreForDisplay = scoreToDisplay;
+    } else {
+        // Calculate score only if needed (e.g., for 'fall' reason without pre-calculated score)
+        finalScoreForDisplay = (() => {
+            const BaseTimeScore = 10000;
+            const PenaltyPerSecond = 10;
+            const PointsPerArtifact = 1000; 
+            const PointsPerMemory = 750;   
+            const elapsedSeconds = this.state.gameTimer;
+            const numArtifacts = this.state.artifacts;
+            const numMemories = this.state.memories;
+            const TimeScore = Math.max(0, BaseTimeScore - (elapsedSeconds * PenaltyPerSecond));
+            const CollectibleScore = (numArtifacts * PointsPerArtifact) + (numMemories * PointsPerMemory);
+            return Math.floor(TimeScore + CollectibleScore);
+        })();
+    }
+
+    // Store the score that will be displayed (might be from win or fall)
+    this.state.scoreFromLastAttempt = finalScoreForDisplay; 
+
+    // <<< MODIFY: Save score based on calculated value if reason is 'fall' OR 'health' >>>
+    if (reason === 'fall' || reason === 'health') { 
+        const timerBeforeReset = this.state.gameTimer;
+        const artifactsBeforeReset = this.state.artifacts;
+        // Use finalScoreForDisplay which was calculated above if scoreToDisplay was null
+        console.log(`Saving score ${finalScoreForDisplay} from reason '${reason}'. Time: ${timerBeforeReset}, Artifacts: ${artifactsBeforeReset}`);
+        this.supabase.saveHighScore(
+            this.playerName,
+            finalScoreForDisplay, 
+            timerBeforeReset, 
+            artifactsBeforeReset
+        ).catch(e => console.error("Failed to save high score on respawn:", e));
+    }
+
+    // Log the score for debugging
+    console.log(`Player Respawning... Reason: ${reason}, Previous Score: ${finalScoreForDisplay}`);
+
     // <<< MODIFY: Use player's internal reset method >>>
     this.player.resetForRespawn();
+
+    // <<< ADD: Reset Game State for the NEW attempt >>>
+    this.state.gameTimer = 0;
+    this.state.artifacts = 0;
+    this.state.memories = 0;
+    this.state.collectedMemories = [];
+    this.levelManager?.resetCollectibles(); // Reset items in the level
 
     // Move player back to start
     this.player.setPosition(this.initialPlayerPosition);
 
     // Briefly show a message via UI
     this.ui.showTemporaryMessage("Respawning...", 2000); // Simpler message
+
+    // <<< MODIFY: Show the final score (passed or calculated) >>>
+    setTimeout(() => {
+        this.ui?.showTemporaryMessage(`Previous Score: ${finalScoreForDisplay}`, 3000);
+    }, 2000); // Delay slightly longer than the first message
 
     // Ensure game continues running
     this.isRunning = true;

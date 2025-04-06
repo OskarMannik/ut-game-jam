@@ -30,6 +30,8 @@ export class AudioManager {
       'surface': '/music/surface.mp3',
       'underwater': '/music/underwater.mp3'
     };
+
+    this.updateVolumes();
   }
   
   async init() {
@@ -278,5 +280,10 @@ export class AudioManager {
   playAmbientSounds(environmentType) {
     this.stopAllLoops(); // Stop previous ambient sounds
     console.log("Ambient sounds not implemented for descent.");
+  }
+
+  // <<< ADD: Method to check master mute state >>>
+  isMasterMuted() {
+    return this.muted;
   }
 } 

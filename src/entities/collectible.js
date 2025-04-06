@@ -111,50 +111,26 @@ export class Collectible {
     
     this.collected = true;
     
-    // Play collection animation
-    this.playCollectionAnimation();
+    // Immediately remove the mesh from the scene
+    if (this.mesh && this.mesh.parent) {
+        // Also remove associated point light if it exists
+        const light = this.mesh.getObjectByProperty('type', 'PointLight');
+        if (light) {
+            this.mesh.remove(light);
+        }
+        // Remove the mesh itself
+        this.mesh.parent.remove(this.mesh);
+        this.mesh.geometry.dispose(); // Dispose geometry
+        if (this.mesh.material.map) this.mesh.material.map.dispose(); // Dispose texture if exists
+        this.mesh.material.dispose(); // Dispose material
+        this.mesh = null; // Clear reference
+    }
     
     return {
       type: this.type,
       id: this.id,
       data: this.data
     };
-  }
-  
-  playCollectionAnimation() {
-    // Scale down and fade out
-    const duration = 0.5; // Animation duration in seconds
-    let progress = 0;
-    
-    const animate = (timestamp) => {
-      if (!this.mesh) return; // Stop if mesh has been removed
-      
-      progress += 1/60; // Roughly 60fps
-      const t = Math.min(progress / duration, 1);
-      
-      // Scale down
-      this.mesh.scale.set(1 - t, 1 - t, 1 - t);
-      
-      // Fade out (if material supports opacity)
-      if (this.mesh.material.transparent) {
-        this.mesh.material.opacity = 1 - t;
-      }
-      
-      // Move upward slightly
-      this.mesh.position.y += 1 * (1/60);
-      
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Animation complete, can now safely remove from scene
-        if (this.mesh.parent) {
-          this.mesh.parent.remove(this.mesh);
-        }
-        this.mesh = null;
-      }
-    };
-    
-    requestAnimationFrame(animate);
   }
 }
 

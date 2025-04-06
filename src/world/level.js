@@ -269,6 +269,32 @@ export class LevelManager {
     return itemData;
   }
   
+  // <<< ADD: Method to reset collectibles >>>
+  resetCollectibles() {
+    console.log("Resetting collectibles...");
+    this.collectibles.forEach(collectible => {
+        if (collectible.collected) {
+            collectible.collected = false;
+            // Re-create mesh if it was removed (or reset its state)
+            // For simplicity, let's assume collect() nulled the mesh
+            if (!collectible.mesh) {
+                 collectible.mesh = collectible.createMesh(); 
+            }
+            // Reset visual state (position, scale, opacity)
+            collectible.mesh.position.copy(collectible.position); // Reset position
+            collectible.mesh.scale.set(1, 1, 1); // Reset scale
+            if (collectible.mesh.material.transparent) {
+                 collectible.mesh.material.opacity = collectible.type === 'memory' ? 0.7 : 1.0; // Reset opacity
+            }
+            // Add mesh back to the scene if it's not already there
+            if (!collectible.mesh.parent) {
+                 this.scene.add(collectible.mesh);
+                 console.log(` - Re-added ${collectible.id} to scene.`);
+            }
+        }
+    });
+  }
+  
   getClosestNPC(position, maxDistance) {
     let closestNPC = null;
     let closestDistanceSq = maxDistance * maxDistance;

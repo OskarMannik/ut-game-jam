@@ -26,6 +26,7 @@ export class UI {
     this.chatUI = {};
     this.highScoreDisplay = {};
     this.initialHighScorePanel = null;
+    this.masterMuteButton = null;
     
     this.isFading = false;
     this.activeMemoryTimeout = null;
@@ -46,15 +47,22 @@ export class UI {
     hudContainer.id = 'hud-container';
     this.container.appendChild(hudContainer);
     
-    // Create UI elements and append to HUD
-    this.createDepthMeter();
-    if (this.depthMeter) hudContainer.appendChild(this.depthMeter.container);
+    // Create UI elements and append to HUD in desired order
+    // <<< Health Bar FIRST >>>
+    this.createHealthBar();
+    if (this.healthBar) hudContainer.appendChild(this.healthBar.container);
     
+    // <<< Depth Meter SECOND >>>
+    this.createDepthMeter(); 
+    if (this.depthMeter) hudContainer.appendChild(this.depthMeter.container); 
+    
+    // <<< Timer Display THIRD >>>
     this.createTimerDisplay();
     if (this.timerDisplay) hudContainer.appendChild(this.timerDisplay.container);
 
-    this.createHealthBar();
-    if (this.healthBar) hudContainer.appendChild(this.healthBar.container);
+    // <<< Master Mute Button LAST in this group >>>
+    this.createMasterMuteButton();
+    if (this.masterMuteButton) hudContainer.appendChild(this.masterMuteButton.button);
     
     // Create other UI elements (append directly to body or container as appropriate)
     this.createInteractionPrompt();
@@ -242,7 +250,6 @@ export class UI {
         <li><strong>A/←:</strong> Left</li> 
         <li><strong>D/→:</strong> Right</li>
         <li><strong>Space:</strong> Jump</li> 
-        <li><strong>P:</strong> Pause</li>
       </ul>
     `;
     this.container.appendChild(this.controlsDisplay);
@@ -1091,6 +1098,29 @@ export class UI {
       body.touch-device-active .controls-display {
         display: none;
       }
+
+      /* <<< ADD: Style for the Master Mute Button >>> */
+      #master-mute-button {
+          /* Inherits basic styles from .ui-element if added to HUD, 
+             but we need specific styling if it's just an icon button */
+          background-color: rgba(0, 0, 0, 0.5);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 5px;
+          padding: 5px 10px;
+          font-size: 20px; /* Adjust size for icon */
+          cursor: pointer;
+          pointer-events: auto; /* Allow clicking */
+          line-height: 1; /* Center icon vertically */
+          transition: background-color 0.2s, color 0.2s;
+          margin-bottom: 8px; /* Add margin like other HUD elements */
+      }
+      #master-mute-button:hover {
+          background-color: rgba(255, 255, 255, 0.2);
+      }
+      #master-mute-button.muted {
+          color: #888; /* Grey out when muted */
+      }
     `;
     
     document.head.appendChild(style);
@@ -1539,5 +1569,37 @@ export class UI {
       if (this.initialHighScorePanel) {
           this.initialHighScorePanel.style.display = 'none';
       }
+  }
+
+  // <<< ADD: Create Master Mute Button Method >>>
+  createMasterMuteButton() {
+    const button = document.createElement('button');
+    button.id = 'master-mute-button';
+    button.className = 'ui-icon-button'; // Use a class for styling
+    button.textContent = '🔊'; // Initial state: Sound On
+    button.setAttribute('title', 'Toggle All Sound (M)'); // Tooltip
+    
+    button.addEventListener('click', () => {
+      if (window.game && window.game.audio) {
+        window.game.audio.toggleMute(); // Call existing master toggle method
+        this.updateMasterMuteButtonVisuals(); // Update button appearance
+      }
+    });
+    
+    this.masterMuteButton = { button };
+    this.updateMasterMuteButtonVisuals(); // Set initial state visual
+  }
+  
+  // <<< ADD: Update Master Mute Button Visuals Method >>>
+  updateMasterMuteButtonVisuals() {
+      if (!this.masterMuteButton || !window.game || !window.game.audio) return;
+      
+      // Ensure isMasterMuted exists before calling
+      const isMuted = typeof window.game.audio.isMasterMuted === 'function' 
+                      ? window.game.audio.isMasterMuted() 
+                      : window.game.audio.muted; // Fallback to checking property directly
+                      
+      this.masterMuteButton.button.textContent = isMuted ? '🔇' : '🔊';
+      this.masterMuteButton.button.classList.toggle('muted', isMuted);
   }
 } 

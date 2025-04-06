@@ -47,6 +47,11 @@ export class Player {
     
     // Collection radius (for picking up items)
     this.collectionRadius = 2.5;
+    
+    // <<< ADD: Create telekinesis indicator mesh upfront >>>
+    this.telekinesisIndicator = this.createTelekinesisIndicator();
+    this.telekinesisIndicator.visible = false; // Start hidden
+    this.mesh.add(this.telekinesisIndicator); // Add it once
   }
   
   createPlayerMesh() {
@@ -433,13 +438,21 @@ export class Player {
   }
   
   enableTelekinesis() {
+    if (this.canTelekinesis) return; // Already enabled
+    
     this.canTelekinesis = true;
-    // Visual indicator that telekinesis is active
+    // <<< MODIFY: Just make the existing indicator visible >>>
+    if (this.telekinesisIndicator) {
+      this.telekinesisIndicator.visible = true;
+    }
+    // REMOVE: Adding mesh dynamically
+    /*
     const telekinesisMaterial = new THREE.MeshBasicMaterial({ color: 0x66ffff, transparent: true, opacity: 0.3 });
     const telekinesisGeometry = new THREE.SphereGeometry(0.3, 16, 16);
     const telekinesisIndicator = new THREE.Mesh(telekinesisGeometry, telekinesisMaterial);
     telekinesisIndicator.position.set(0, 0, 0);
     this.mesh.add(telekinesisIndicator);
+    */
   }
   
   takeDamage(amount) {
@@ -491,6 +504,13 @@ export class Player {
       this.isJumping = false;
       this.currentHealth = this.maxHealth;
       this.isDead = false;
+      
+      // <<< ADD: Reset abilities on respawn >>>
+      this.hasHighJump = false;
+      this.canTelekinesis = false;
+      if (this.telekinesisIndicator) {
+          this.telekinesisIndicator.visible = false; // Hide indicator
+      }
   }
 
   // <<< ADD: Method to get current health state >>>
@@ -514,5 +534,14 @@ export class Player {
     } else {
       // REMOVE: console.log(`Player health already full.`);
     }
+  }
+
+  // <<< ADD: Separate method to create the indicator >>>
+  createTelekinesisIndicator() {
+    const telekinesisMaterial = new THREE.MeshBasicMaterial({ color: 0x66ffff, transparent: true, opacity: 0.3 });
+    const telekinesisGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const indicator = new THREE.Mesh(telekinesisGeometry, telekinesisMaterial);
+    indicator.position.set(0, 0, 0); // Position relative to player mesh group
+    return indicator;
   }
 } 

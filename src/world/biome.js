@@ -898,6 +898,10 @@ export class Biome {
         const yDrop = averageYDrop * (1 + progress * 0.5) * (1 + (Math.random() - 0.5) * 0.4); 
         currentY -= yDrop;
         
+        // <<< ADD: Clamp minimum Y position >>>
+        const minPlatformY = 5; // Minimum height above the final Y=0 platform
+        currentY = Math.max(minPlatformY, currentY);
+        
         let x = (Math.random() - 0.5) * horizontalRange * 2;
         let z = (Math.random() - 0.5) * horizontalRange * 2;
 

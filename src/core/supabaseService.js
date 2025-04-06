@@ -41,7 +41,13 @@ export class SupabaseService {
       return;
     }
 
-    console.log(`Attempting to save high score: ${playerName} - ${score}`);
+    console.log(`Attempting to save high score:`, {
+      player_name: playerName,
+      score: score,
+      game_time: Math.floor(gameTime),
+      artifacts_collected: artifactsCollected
+    });
+
     try {
       // <<< Round the score before inserting >>>
       const scoreToSave = Math.floor(score);
