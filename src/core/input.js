@@ -41,11 +41,18 @@ export class InputManager {
     this.handleKeyUp = this.handleKeyUp.bind(this);
     
     this.isChatFocused = false; // <<< ADD Flag >>>
+    
+    // <<< ADD Joystick State >>>
+    this.joystickX = 0;
+    this.joystickY = 0;
+    this.joystickThreshold = 0.2; // Dead zone threshold
   }
   
   init(chatInputElement = null) {
     this.chatInputElement = chatInputElement;
     this.isChatFocused = false; // Ensure flag is reset on init
+    this.joystickX = 0; // Ensure joystick is reset on init
+    this.joystickY = 0;
     
     // Register event listeners
     window.addEventListener('keydown', this.handleKeyDown);
@@ -89,14 +96,55 @@ export class InputManager {
   }
   
   getInputState() {
-    return { ...this.inputState }; // Return a copy of the input state
+    // Start with a copy of the base state (captures key presses and button touches)
+    const state = { ...this.inputState }; 
+
+    // <<< Derive movement from Joystick >>>
+    // Reset joystick-derived movement flags first
+    state.forward = false;
+    state.backward = false;
+    state.left = false;
+    state.right = false;
+
+    if (this.joystickY > this.joystickThreshold) {
+        state.forward = true;
+    } else if (this.joystickY < -this.joystickThreshold) {
+        state.backward = true;
+    }
+    
+    if (this.joystickX < -this.joystickThreshold) {
+        state.left = true;
+    } else if (this.joystickX > this.joystickThreshold) {
+        state.right = true;
+    }
+    
+    // Combine with keyboard state (allow keyboard to override/add)
+    // If W is pressed OR joystick is up, forward should be true.
+    state.forward = state.forward || this.inputState.forward;
+    state.backward = state.backward || this.inputState.backward;
+    state.left = state.left || this.inputState.left;
+    state.right = state.right || this.inputState.right;
+    
+    // Keep jump/pause etc. from the base state (keys/buttons)
+    state.jump = this.inputState.jump;
+    state.pause = this.inputState.pause;
+    state.action = this.inputState.action;
+    state.interact = this.inputState.interact;
+    state.down = this.inputState.down;
+
+    return state; 
   }
   
   clearInputState() {
-    // Reset all inputs to false
+    // Reset all boolean inputs to false
     Object.keys(this.inputState).forEach(key => {
       this.inputState[key] = false;
     });
+    // <<< Reset joystick state >>>
+    this.joystickX = 0;
+    this.joystickY = 0;
+    // Also clear active button touches
+    this.activeTouches = {};
   }
   
   // Method to add touch/mobile controls in the future
@@ -159,5 +207,12 @@ export class InputManager {
       // Optional: Clear any active game input state when chat gets focus
       // this.clearInputState(); 
     }
+  }
+  
+  // <<< ADD Method to update Joystick state >>>
+  updateJoystick(x, y) {
+      // Clamp values between -1 and 1 just in case
+      this.joystickX = Math.max(-1, Math.min(1, x));
+      this.joystickY = Math.max(-1, Math.min(1, y));
   }
 } 
