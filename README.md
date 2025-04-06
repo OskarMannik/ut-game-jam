@@ -51,6 +51,13 @@ npm run dev
 - **E**: Interact with objects
 - **F**: Use artifact ability (when available)
 
+## Gameplay
+
+- **Goal:** Descend the platforms, collect Artifacts & Memories, and reach the bottom safely.
+- **Scoring:** Your score is calculated based on how quickly you descend, the number of Artifacts (+1000 points each) and Memories (+750 points each) collected. There's also a bonus for successfully reaching the end.
+- **Abilities:** Collecting your first Artifact grants the ability to jump higher.
+- **Falling:** Be careful when jumping between platforms! Falling causes significant damage. Missing more than one platform in a single jump is fatal and will reset your progress for that attempt.
+
 ## Game Structure
 
 The game is built using a modular architecture:
