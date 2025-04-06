@@ -22,6 +22,8 @@ export class Game {
     this.audio = new AudioManager();
     this.supabase = new SupabaseService(); // <<< INSTANTIATE
     this.isRunning = false;
+    this.isPaused = false;
+    this.isUserPaused = false;
     this.interactingNPC = null;
     this.initialPlayerPosition = null;
     
@@ -36,7 +38,7 @@ export class Game {
     // <<< ADD Map Regeneration State >>>
     this.mapRegenInterval = 5 * 60 * 1000; // 5 minutes in milliseconds
     this.timeSinceLastRegen = 0;
-
+    
     // Game state
     this.state = {
       artifacts: 0,
@@ -77,7 +79,7 @@ export class Game {
          // Optionally show panel with error/loading state
          // this.ui.showInitialHighScores([]); 
     }
-
+    
     // Create first level
     await this.levelManager.loadLevel(0);
     
@@ -100,9 +102,9 @@ export class Game {
     this.startGameLoop = () => {
        if (this.isRunning) return; // Prevent multiple starts
        console.log("Starting game loop...");
-       this.isRunning = true;
-       this.clock.start();
-       this.update();
+    this.isRunning = true;
+    this.clock.start();
+    this.update();
        this.audio.playMusic('surface', { volume: 0.4 });
        this.ui.hideInitialHighScores(); // Ensure panel is hidden
     };
@@ -114,38 +116,68 @@ export class Game {
     if (!this.isRunning) return;
     
     // <<< MOVE: Calculate deltaTime first
-    const deltaTime = this.clock.getDelta();
+    const deltaTime = this.isUserPaused ? 0 : this.clock.getDelta(); // Get deltaTime ONLY if not user-paused
     
     // Always get input state first
     const inputState = this.input.getInputState();
 
-    // --- Handle Interactions (Simplified) ---
-    if (inputState.interact) {
-      if (this.interactingNPC) {
-         // If already interacting, check win condition or end dialogue
-         if (this.interactingNPC.appearance?.isWinConditionNPC) {
-             this.checkWinCondition(); 
-         } 
-         this.unpauseAndEndDialogue(); // End dialogue regardless (win sets isRunning=false)
-      } else {
-         // If not interacting, check for nearby NPCs
-         const nearbyNPC = this.levelManager.findNearbyInteractable(this.player.mesh.position, 2.0);
-         if (nearbyNPC) {
-            this.startInteraction(nearbyNPC);
-         } else {
-             // Maybe trigger player's own interact action if no NPC?
-             this.player.handleInteract();
+    // --- Check for User Pause Toggle --- 
+    if (inputState.pause) {
+        this.togglePause();
+        this.input.clearInputState(); // Consume the pause input for this frame
+    }
+
+    // Handle Dialogue Pause State (takes precedence over user pause for dialogue flow)
+    if (this.isPaused && this.interactingNPC) { // Paused for dialogue
+      if (inputState.interact && this.interactingNPC) {
+        // If paused for dialogue and interact is pressed, get the next line
+        
+        // <<< MODIFY: Check for win condition NPC interaction >>>
+        if (this.interactingNPC.appearance?.isWinConditionNPC) {
+          this.checkWinCondition();
+          // If checkWinCondition triggers win, it will set isRunning = false
+          // If not won, proceed with normal dialogue or end it
+          if (this.isRunning) {
+             this.unpauseAndEndDialogue();
+          }
+        }
+        // Original Trade Logic (can be kept or removed)
+        // else {
+        //   const nextDialogueData = this.interactingNPC.interact();
+        //   if (nextDialogueData.canTrade) {
+        //     this.presentTradeOptions(nextDialogueData);
+        //   } else if (nextDialogueData.isComplete) {
+        //     this.unpauseAndEndDialogue();
+        //   } else {
+        //     this.ui.showDialogue(nextDialogueData.speaker, nextDialogueData.text);
+        //     this.input.clearInputState(); // Consume input for this frame
+        //   }
+        // }
+         else { // <<< ADD: Handle non-win NPC dialogue >>>
+             // Default behavior: just end dialogue after first interaction for non-win NPCs
+             this.unpauseAndEndDialogue();
          }
+      } else if (inputState.interact && !this.interactingNPC) {
+          // Failsafe: If paused but somehow lost NPC ref, just unpause
+          this.unpauseAndEndDialogue();
       }
-      this.input.clearInputState(); // Consume interact input
+      // Still need to keep the animation frame loop going while paused
+      requestAnimationFrame(this.update);
+      return; // Prevent rest of update logic (player movement etc.)
     }
     
-    // If dialogue is active, don't update player/world (prevents movement during dialogue)
-    if (this.interactingNPC) {
-       this.renderer.render(this.levelManager.scene, deltaTime);
-       requestAnimationFrame(this.update); // Keep rendering
-       return; // Skip player/world update
+    // --- Handle User Pause State --- 
+    if (this.isUserPaused) {
+        // Optional: Render a pause screen overlay via UI
+        this.renderer.render(this.levelManager.scene, 0); // Render static scene
+        requestAnimationFrame(this.update);
+        return; // Skip game logic updates
     }
+    
+    // --- If NOT paused (by dialogue or user) --- 
+    // const dialogueData = this.player.getCurrentDialogue();
+    // console.log(`[Game.update] Received dialogue data from player:`, dialogueData); 
+    // if (dialogueData) { ... } else { ... }
     
     // Normal game updates only if NOT starting dialogue
     this.player.update(deltaTime, inputState, this.levelManager);
@@ -174,7 +206,7 @@ export class Game {
 
     // Update game state (only checks win/lose now)
     this.updateGameState(deltaTime);
-
+    
     // Update UI (non-dialogue parts)
     this.ui.update(this.state);
     
@@ -192,10 +224,12 @@ export class Game {
     }
     
     // <<< ADD: Check for Map Regeneration >>>
-    this.timeSinceLastRegen += deltaTime * 1000; // deltaTime is in seconds
-    if (this.timeSinceLastRegen >= this.mapRegenInterval) {
-       this.regenerateLevel();
-       // Don't return here, let the rest of the frame process before potential async reload
+    if (!this.isUserPaused && !this.isPaused) { // Only update timer if game is active
+       this.timeSinceLastRegen += deltaTime * 1000; // deltaTime is in seconds
+       if (this.timeSinceLastRegen >= this.mapRegenInterval) {
+          this.regenerateLevel();
+          // Don't return here, let the rest of the frame process before potential async reload
+       }
     }
 
     // Update other player name sprite positions (after local player update)
@@ -222,7 +256,9 @@ export class Game {
     }
 
     // Increment Timer 
-    this.state.gameTimer += deltaTime; // Count up
+    if (!this.isUserPaused && !this.isPaused) { 
+        this.state.gameTimer += deltaTime; // Count up
+    }
 
     // Check for falling out of world
     if (this.player.mesh.position.y < -20) { 
@@ -364,6 +400,8 @@ export class Game {
     
     // Restart the game loop
     this.isRunning = true;
+    this.isPaused = false;
+    this.isUserPaused = false;
     this.interactingNPC = null;
     this.clock.start();
     this.update();
@@ -372,16 +410,40 @@ export class Game {
   // Helper function to unpause and clean up dialogue state
   unpauseAndEndDialogue() {
     this.ui.hideDialogue();
+    this.isPaused = false;
     this.interactingNPC = null;
     this.input.clearInputState(); 
   }
 
-  // <<< ADD: Start Interaction Method >>>
-  startInteraction(npc) {
-      this.interactingNPC = npc;
-      const dialogueData = npc.getInitialDialogue ? npc.getInitialDialogue() : { speaker: npc.name, text: "..." };
-      this.ui.showDialogue(dialogueData.speaker, dialogueData.text); // Show only initial text
-      this.input.clearInputState(); // Consume input
+  // <<< ADD: Toggle Pause Method
+  togglePause() {
+    this.isUserPaused = !this.isUserPaused;
+    if (this.isUserPaused) {
+      this.clock.stop(); // Stop the clock to halt physics time
+      this.audio.pauseAudio(); // <<< Use new method
+      this.ui.showPauseScreen(); // Show UI overlay
+    } else {
+      this.clock.start(); // Resume the clock
+      this.audio.resumeAudio(); // <<< Use new method
+      this.ui.hidePauseScreen(); // Hide UI overlay
+    }
+  }
+
+  // <<< MODIFY: Check Win Condition >>>
+  checkWinCondition() {
+    // Win condition is now simply interacting with the Guardian after spawning
+    if (this.interactingNPC && this.interactingNPC.name === "Guardian of the Depths") {
+        this.gameWon();
+    } else {
+        // This should ideally not be reached if interaction logic is correct,
+        // but leave a failsafe dialogue
+        this.ui.showDialogue(
+            this.interactingNPC?.name || "???",
+            `Something seems incomplete...`,
+            [{ text: "(Leave)", callback: () => this.unpauseAndEndDialogue() }]
+        );
+        this.input.clearInputState();
+    }
   }
 
   gameWon() {
@@ -447,6 +509,8 @@ export class Game {
 
     // Ensure game continues running
     this.isRunning = true;
+    this.isPaused = false;
+    this.isUserPaused = false;
 
     // Optional: Add a small visual/audio cue for respawn
     this.audio.play('player_respawn'); // Assuming you have a sound named 'player_respawn'
@@ -726,7 +790,7 @@ export class Game {
     this.otherPlayers = {}; // Reset the cache
     
     // Stop current music maybe?
-    this.audio.stopMusic();
+    this.audio.stopMusic(); 
     
     // Reload level 0 (which handles clearing old scene objects)
     await this.levelManager.loadLevel(0);
@@ -751,22 +815,5 @@ export class Game {
     this.audio.playMusic('surface', { volume: 0.4 });
     
     console.log("Map regeneration complete.");
-  }
-
-  // <<< MODIFY: Check Win Condition (This is the intended location) >>>
-  checkWinCondition() {
-    // Win condition is now simply interacting with the Guardian after spawning
-    if (this.interactingNPC && this.interactingNPC.name === "Guardian of the Depths") {
-        this.gameWon();
-    } else {
-        // This should ideally not be reached if interaction logic is correct,
-        // but leave a failsafe dialogue
-        this.ui.showDialogue(
-            this.interactingNPC?.name || "???",
-            `Something seems incomplete...`,
-            [{ text: "(Leave)", callback: () => this.unpauseAndEndDialogue() }]
-        );
-        this.input.clearInputState();
-    }
   }
 } 
