@@ -157,21 +157,52 @@ export class Player {
     // Track if player is moving
     let isMoving = false;
     
-    // Apply movement based on input
-    if (inputState.forward) {
-      this.velocity.add(forward.multiplyScalar(this.moveSpeed));
-      isMoving = true;
+    // <<< REVISED Movement Logic >>>
+    let moveDirection = new THREE.Vector3();
+    const joystickActive = Math.abs(inputState.joystickX) > this.inputManager.joystickThreshold || 
+                           Math.abs(inputState.joystickY) > this.inputManager.joystickThreshold;
+
+    if (joystickActive) {
+        // Use joystick input if active beyond threshold
+        // Use joystickY for forward/backward, ignore keyboard W/S
+        moveDirection.add(forward.clone().multiplyScalar(inputState.joystickY));
+        isMoving = Math.abs(inputState.joystickY) > this.inputManager.joystickThreshold; 
+
+        // Handle rotation (Turning) based on joystickX (can adjust sensitivity later)
+        // A negative joystickX (left) should cause positive rotation (counter-clockwise)
+        this.mesh.rotation.y += inputState.joystickX * -this.turnSpeed * deltaTime * 2.0; // Added multiplier for sensitivity
+
+        // Optional: Could also add strafing based on joystickX, but let's keep it simple first
+        // moveDirection.add(right.clone().multiplyScalar(inputState.joystickX));
+        // isMoving = isMoving || Math.abs(inputState.joystickX) > this.inputManager.joystickThreshold;
+
+    } else {
+        // Fallback to keyboard if joystick is not active (or for non-touch)
+        if (inputState.forward) {
+          moveDirection.add(forward);
+          isMoving = true;
+        }
+        if (inputState.backward) {
+          moveDirection.add(forward.clone().multiplyScalar(-0.7)); // Slower backward
+          isMoving = true;
+        }
+        // Keyboard turning (keep separate from joystick turning for now)
+        if (inputState.left) {
+          this.mesh.rotation.y += this.turnSpeed * deltaTime;
+        }
+        if (inputState.right) {
+          this.mesh.rotation.y -= this.turnSpeed * deltaTime;
+        }
     }
-    if (inputState.backward) {
-      this.velocity.add(forward.multiplyScalar(-this.moveSpeed * 0.7)); // Slower backward movement
-      isMoving = true;
+
+    // Normalize move direction if needed (prevents faster diagonal movement)
+    if (moveDirection.lengthSq() > 0) {
+       moveDirection.normalize();
     }
-    if (inputState.left) {
-      this.mesh.rotation.y += this.turnSpeed * deltaTime;
-    }
-    if (inputState.right) {
-      this.mesh.rotation.y -= this.turnSpeed * deltaTime;
-    }
+    
+    // Apply final velocity based on direction and speed
+    this.velocity.x = moveDirection.x * this.moveSpeed;
+    this.velocity.z = moveDirection.z * this.moveSpeed;
     
     // Handle jumping
     if (inputState.jump && this.isGrounded) {

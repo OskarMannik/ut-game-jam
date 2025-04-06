@@ -45,7 +45,7 @@ export class InputManager {
     // <<< ADD Joystick State >>>
     this.joystickX = 0;
     this.joystickY = 0;
-    this.joystickThreshold = 0.2; // Dead zone threshold
+    this.joystickThreshold = 0.35; // Dead zone threshold
   }
   
   init(chatInputElement = null) {
@@ -131,6 +131,10 @@ export class InputManager {
     state.action = this.inputState.action;
     state.interact = this.inputState.interact;
     state.down = this.inputState.down;
+
+    // <<< ADD Raw Joystick values to state >>>
+    state.joystickX = this.joystickX;
+    state.joystickY = this.joystickY;
 
     return state; 
   }
