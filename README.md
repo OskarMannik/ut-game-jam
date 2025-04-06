@@ -1,87 +1,25 @@
 # Deep Dive
 
-An exploration game about descending into the depths, created for a game jam with the theme "Depths".
+**Description:**
+This is a 3D multiplayer video game created by Oskar Männik and Philip Paškov for the University of Tartu Game Jam 2025.
 
-## Description
+**Try it out:**
+https://deepjump.vercel.app/
 
-In Deep Dive, players take on the role of a mysterious explorer venturing through increasingly deeper layers of reality - physical, emotional, and metaphysical. As players descend further, they collect artifacts that grant special abilities and uncover memory fragments that reveal the story.
+**Goal:**
+Reach the bottom platform safely while collecting as many items as possible to increase score.
 
-The game features:
-- Exploration across 5 distinct depth layers (Surface, Underwater, Caves, Ruins, Subconscious, and Cosmic Void)
-- Oxygen management system that becomes more challenging at deeper levels
-- Collection of artifacts that grant special abilities
-- Memory fragments that reveal the backstory
-- Different movement physics between land and underwater sections
-- Atmospheric environments with unique visuals and audio
+**Controls:**
+*   **W/Up Arrow:** Move Forward
+*   **S/Down Arrow:** Move Backward
+*   **A/Left Arrow:** Turn Left
+*   **D/Right Arrow:** Turn Right
+*   **Spacebar:** Jump
 
-## Getting Started
 
-### Prerequisites
-
-- Node.js (v14.0.0 or higher)
-- A modern web browser
-
-### Installation
-
-1. Clone the repository
-```bash
-git clone https://github.com/yourusername/deep-dive.git
-cd deep-dive
-```
-
-2. Install dependencies
-```bash
-npm install
-```
-
-3. Start the development server
-```bash
-npm run dev
-```
-
-4. Open your browser and navigate to `http://localhost:5173`
-
-## Controls
-
-- **W/↑**: Move Forward
-- **S/↓**: Move Backward
-- **A/←**: Turn Left
-- **D/→**: Turn Right
-- **Space**: Jump (on land) / Swim Up (underwater)
-- **E**: Interact with objects
-- **F**: Use artifact ability (when available)
-
-## Gameplay
-
-- **Goal:** Descend the platforms, collect Artifacts & Memories, and reach the bottom safely.
-- **Scoring:** Your score is calculated based on how quickly you descend, the number of Artifacts (+1000 points each) and Memories (+750 points each) collected. There's also a bonus for successfully reaching the end.
-- **Abilities:** Collecting your first Artifact grants the ability to jump higher.
-- **Falling:** Be careful when jumping between platforms! Falling causes significant damage. Missing more than one platform in a single jump is fatal and will reset your progress for that attempt.
-
-## Game Structure
-
-The game is built using a modular architecture:
-
-```
-/src
-  /core         - Core game systems
-  /entities     - Game entities (player, collectibles, etc.)
-  /world        - Level and environment systems
-  /ui           - User interface components
-  /utils        - Utility functions and helpers
-```
-
-## Technology
-
-- Built with [Three.js](https://threejs.org/) for 3D rendering
-- Uses [Vite](https://vitejs.dev/) for fast development and building
-- Pure JavaScript with ES modules for code organization
-
-## Credits
-
-- Game concept and development: [Your Name]
-- Theme: Depths (Game Jam Theme)
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Gameplay:**
+*   **Scoring:** Your score is based on how quickly you descend, plus points for each Artifact (+1000) and Memory (+750) collected. Reaching the end gives a bonus.
+*   **High Jump:** Collecting your first Artifact unlocks a higher jump ability.
+*   **Falling:** Be careful! Missing a platform and falling causes damage. Falling past more than one platform in a single jump will kill you and reset your current attempt.
+*   **Multiplayer:** See other players exploring alongside you and chat with them.
+*   **Map Regeneration:** The level layout regenerates every 5 minutes.
