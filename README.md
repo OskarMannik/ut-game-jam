@@ -23,3 +23,4 @@ Reach the bottom platform safely while collecting as many items as possible to i
 *   **Falling:** Be careful! Missing a platform and falling causes damage. Falling past more than one platform in a single jump will kill you and reset your current attempt.
 *   **Multiplayer:** See other players exploring alongside you and chat with them.
 *   **Map Regeneration:** The level layout regenerates every 5 minutes.
+ 
