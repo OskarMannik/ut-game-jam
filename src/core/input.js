@@ -32,17 +32,19 @@ export class InputManager {
       ' ': 'jump',
       'z': 'down',
       'e': 'interact',
-      'f': 'action',
-      'p': 'pause'
+      'f': 'action'
     };
     
     // Bind event handlers
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
+    
+    this.isChatFocused = false; // <<< ADD Flag >>>
   }
   
   init(chatInputElement = null) {
     this.chatInputElement = chatInputElement;
+    this.isChatFocused = false; // Ensure flag is reset on init
     
     // Register event listeners
     window.addEventListener('keydown', this.handleKeyDown);
@@ -56,9 +58,8 @@ export class InputManager {
   }
   
   handleKeyDown(event) {
-    if (this.chatInputElement && document.activeElement === this.chatInputElement) {
+    if (this.isChatFocused) {
       // If chat input is focused, let browser handle typing normally.
-      // Only potentially intercept 'Enter' if needed elsewhere, but chat UI handles it.
       return; // Don't process game keys
     }
     
@@ -72,7 +73,7 @@ export class InputManager {
   }
   
   handleKeyUp(event) {
-    if (this.chatInputElement && document.activeElement === this.chatInputElement) {
+    if (this.isChatFocused) {
       // If chat input is focused, let browser handle typing normally.
       return; // Don't process game keys
     }
@@ -147,5 +148,15 @@ export class InputManager {
   
   updateInputState() {
     // Implement the logic to update the input state based on touch events
+  }
+  
+  // <<< ADD Method to set focus state >>>
+  setChatFocus(isFocused) {
+    this.isChatFocused = isFocused;
+    // console.log("Chat Focus set to:", this.isChatFocused); // Debug log
+    if (isFocused) {
+      // Optional: Clear any active game input state when chat gets focus
+      // this.clearInputState(); 
+    }
   }
 } 

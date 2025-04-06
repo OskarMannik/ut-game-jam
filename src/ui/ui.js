@@ -5,6 +5,7 @@ export class UI {
   constructor() {
     // Reference to game state
     this.gameState = null;
+    this.inputManager = null;
     
     // UI elements
     this.container = null;
@@ -31,8 +32,9 @@ export class UI {
     this.messageTimeout = null;
   }
   
-  init(gameState) {
+  init(gameState, inputManager) {
     this.gameState = gameState;
+    this.inputManager = inputManager;
     
     // Create main UI container
     this.container = document.createElement('div');
@@ -62,7 +64,6 @@ export class UI {
     this.createControlsDisplay();
     this.createMemoryLogPanel();
     this.createDialogueBox();
-    this.createPauseScreen();
     this.createGameWonScreen();
     this.createCrosshair();
     this.createTouchControls();
@@ -237,13 +238,9 @@ export class UI {
       <ul>
         <li><strong>W/↑:</strong> Forward</li>
         <li><strong>S/↓:</strong> Backward</li>
-        <li><strong>A/←:</strong> Turn Left</li>
-        <li><strong>D/→:</strong> Turn Right</li>
-        <li><strong>Space:</strong> Jump / Swim Up</li>
-        <li><strong>Z:</strong> Swim Down</li>
-        <li><strong>E:</strong> Interact</li>
-        <li><strong>F:</strong> Use Ability</li>
-        <li><strong>P:</strong> Pause</li>
+        <li><strong>A/←:</strong> Left</li> 
+        <li><strong>D/→:</strong> Right</li>
+        <li><strong>Space:</strong> Jump</li>  
       </ul>
     `;
     this.container.appendChild(this.controlsDisplay);
@@ -292,19 +289,6 @@ export class UI {
     document.body.appendChild(this.dialogueBox);
 
     // Close on next interact press (will be handled in Game update)
-  }
-  
-  createPauseScreen() {
-    this.pauseScreen = document.createElement('div');
-    this.pauseScreen.className = 'pause-screen';
-    this.pauseScreen.style.display = 'none';
-    this.pauseScreen.innerHTML = `
-      <div class="pause-content">
-        <h1>PAUSED</h1>
-        <p>Press 'P' to resume</p>
-      </div>
-    `;
-    document.body.appendChild(this.pauseScreen);
   }
   
   createGameWonScreen() {
@@ -365,15 +349,18 @@ export class UI {
     const actionContainer = document.createElement('div');
     actionContainer.className = 'touch-action-container';
     this.touchControls.jump = this.createTouchButton('JUMP', 'jump', actionContainer); // Or an icon
-    this.touchControls.interact = this.createTouchButton('E', 'interact', actionContainer);
-    this.touchControls.action = this.createTouchButton('F', 'action', actionContainer);
-    // Maybe a pause button?
-    this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer);
+    // this.touchControls.interact = this.createTouchButton('E', 'interact', actionContainer);
+    // this.touchControls.action = this.createTouchButton('F', 'action', actionContainer);
+    // Maybe a pause button? Keep Pause for now
+    // this.touchControls.pause = this.createTouchButton('P', 'pause', actionContainer); // <<< REMOVE Pause Button >>>
 
 
     controlsContainer.appendChild(moveContainer);
     controlsContainer.appendChild(actionContainer);
     document.body.appendChild(controlsContainer); // Append to body to overlay game canvas
+    
+    // <<< ADD Class to body if touch controls are created >>>
+    document.body.classList.add('touch-device-active'); 
   }
 
   // Helper to create a single touch button
@@ -763,37 +750,6 @@ export class UI {
         background-color: #4477aa;
       }
       
-      .pause-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1100;
-        font-family: Arial, sans-serif;
-      }
-      
-      .pause-content {
-        text-align: center;
-      }
-      
-      .pause-content h1 {
-        font-size: 48px;
-        margin-bottom: 10px;
-        letter-spacing: 3px;
-        text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-      }
-      
-      .pause-content p {
-        font-size: 20px;
-        opacity: 0.8;
-      }
-
       .game-won-screen {
         position: fixed;
         top: 0;
@@ -1084,6 +1040,25 @@ export class UI {
         #close-initial-scores:hover {
            background-color: #4cae4c;
        }
+
+      /* <<< HIDE Controls Display on Touch Devices >>> */
+      body.touch-device-active .controls-display {
+        display: none;
+      }
+
+      /* <<< ADJUST UI for Touch Devices >>> */
+      body.touch-device-active .chat-container {
+          max-height: 100px; /* Significantly reduce height */
+          width: 60%;      /* Make it narrower */
+          font-size: 0.8em; /* Slightly smaller text */
+          bottom: 70px;    /* Move it up slightly to avoid controls */
+          left: 10px;
+      }
+      body.touch-device-active #health-bar-container {
+          top: 50px;  /* Move health bar down below depth/time */
+          right: 10px; /* Keep it top-right-ish */
+          width: 100px; /* Maybe make it slightly smaller */
+      }
     `;
     
     document.head.appendChild(style);
@@ -1298,18 +1273,6 @@ export class UI {
     }
   }
 
-  showPauseScreen() {
-    if (this.pauseScreen) {
-      this.pauseScreen.style.display = 'flex';
-    }
-  }
-  
-  hidePauseScreen() {
-    if (this.pauseScreen) {
-      this.pauseScreen.style.display = 'none';
-    }
-  }
-
   showGameWon(gameState, highScores = []) {
     if (!this.gameWonScreen) return;
     const statsContainer = this.gameWonScreen.querySelector('.game-over-stats'); 
@@ -1420,8 +1383,20 @@ export class UI {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         sendMessage();
+        // Optional: Force blur after sending on Enter key, useful for mobile
+        // chatInput.blur(); 
       }
     });
+
+    // <<< ADD Focus/Blur Listeners >>>
+    if (this.inputManager) { // Check if InputManager was passed
+      chatInput.addEventListener('focus', () => {
+        this.inputManager.setChatFocus(true);
+      });
+      chatInput.addEventListener('blur', () => {
+        this.inputManager.setChatFocus(false);
+      });
+    }
 
     inputContainer.appendChild(chatInput);
     inputContainer.appendChild(sendButton);
