@@ -29,7 +29,7 @@ function showNameInputUI() {
 
   const startButton = document.createElement('button');
   startButton.id = 'start-game-button';
-  startButton.textContent = 'Start Exploring';
+  startButton.textContent = 'Start';
 
   content.appendChild(title);
   content.appendChild(input);

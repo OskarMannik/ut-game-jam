@@ -1531,7 +1531,19 @@ export class UI {
             <h2>Top Scores</h2>
             <ul class="high-score-list"><li>Loading...</li></ul>
             <p>(Scores will update after you play)</p>
-            <button id="close-initial-scores">Start Game</button> <!-- Optional close button -->
+
+            <!-- <<< ADDED: Game Guidelines Section >>> -->
+            <div id="game-guidelines" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.3); text-align: left; font-size: 16px; line-height: 1.7;">
+                <h4 style="margin-bottom: 10px; text-align: center;">How to Play</h4>
+                <p><strong>Goal:</strong> Descend the platforms, collect Artifacts & Memories, and reach the bottom safely.</p>
+                <p><strong>Controls:</strong> [W/↑] Forward | [S/↓] Backward | [A/←] Turn Left | [D/→] Turn Right | [Space] Jump | [E] Interact | [P] Pause</p>
+                <p><strong>Scoring:</strong> Points awarded for speed, Artifacts (+1000), and Memories (+750). Bonus for reaching the end.</p>
+                <p><strong>Abilities:</strong> Collecting your first Artifact grants a higher jump!</p>
+                <p><strong>Falling:</strong> Be careful! Missing platforms causes fall damage. Missing more than one platform in a single jump will result in death!</p>
+            </div>
+            <!-- <<< END: Game Guidelines Section >>> -->
+
+            <button id="close-initial-scores">Start Game</button>
         </div>
     `;
     // Hide it initially, game logic will show it
