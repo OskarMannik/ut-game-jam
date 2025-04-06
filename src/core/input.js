@@ -135,6 +135,7 @@ export class InputManager {
     // <<< ADD Raw Joystick values to state >>>
     state.joystickX = this.joystickX;
     state.joystickY = this.joystickY;
+    state.joystickThreshold = this.joystickThreshold;
 
     return state; 
   }

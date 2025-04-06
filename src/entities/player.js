@@ -159,14 +159,15 @@ export class Player {
     
     // <<< REVISED Movement Logic >>>
     let moveDirection = new THREE.Vector3();
-    const joystickActive = Math.abs(inputState.joystickX) > this.inputManager.joystickThreshold || 
-                           Math.abs(inputState.joystickY) > this.inputManager.joystickThreshold;
+    const joystickThreshold = inputState.joystickThreshold || 0.2; // Default if missing
+    const joystickActive = Math.abs(inputState.joystickX) > joystickThreshold || 
+                           Math.abs(inputState.joystickY) > joystickThreshold;
 
     if (joystickActive) {
         // Use joystick input if active beyond threshold
         // Use joystickY for forward/backward, ignore keyboard W/S
         moveDirection.add(forward.clone().multiplyScalar(inputState.joystickY));
-        isMoving = Math.abs(inputState.joystickY) > this.inputManager.joystickThreshold; 
+        isMoving = Math.abs(inputState.joystickY) > joystickThreshold; 
 
         // Handle rotation (Turning) based on joystickX (can adjust sensitivity later)
         // A negative joystickX (left) should cause positive rotation (counter-clockwise)
